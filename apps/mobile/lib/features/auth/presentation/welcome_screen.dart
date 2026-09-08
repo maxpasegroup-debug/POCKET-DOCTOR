@@ -21,7 +21,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           'Make room for your physical health, mental wellbeing and everyday wellness.',
       icon: Icons.auto_stories_outlined,
       note: 'Learn & Transform',
-      detail: 'Doctor-led recorded and live programs are coming soon.',
+      detail: 'Explore doctor-led learning for your everyday wellbeing.',
     ),
     (
       title: 'Expert support.\nWhen you need it.',
@@ -30,7 +30,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       icon: Icons.people_outline,
       note: 'Talk to a Doctor',
       detail:
-          'Connect with verified Pocket Doctor partner doctors in a future release.',
+          'Explore partner profiles and check available consultation services.',
     ),
     (
       title: 'Better health.\nAn everyday habit.',
@@ -39,7 +39,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       icon: Icons.spa_outlined,
       note: 'Support for your everyday',
       detail:
-          'Curated wellness medicines and an AI health companion are on the way.',
+          'Explore curated wellness products, personal goals and reminders.',
     ),
   ];
   @override
@@ -50,8 +50,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       body: SafeArea(
         child: PageBody(
           children: [
-            const BrandLockup(showTagline: true),
-            const SizedBox(height: 32),
+            const Center(child: BrandLockup()),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -70,12 +70,55 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            Icon(page.icon, size: 64, color: AppColors.green),
-            const SizedBox(height: 32),
-            Text(page.title, style: Theme.of(context).textTheme.displaySmall),
+            Center(
+              child: Text(
+                page.title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
             const SizedBox(height: 20),
-            Text(page.text, style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                page.text,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: const BoxDecoration(
+                  color: AppColors.mint,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(page.icon, size: 72, color: AppColors.green),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: const [
+                  Chip(
+                    avatar: Icon(Icons.favorite_border, size: 18),
+                    label: Text('Physical health'),
+                  ),
+                  Chip(
+                    avatar: Icon(Icons.self_improvement, size: 18),
+                    label: Text('Mental wellbeing'),
+                  ),
+                  Chip(
+                    avatar: Icon(Icons.spa_outlined, size: 18),
+                    label: Text('Wellness'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             FoundationCard(
               color: AppColors.mint,
               child: Column(
@@ -91,7 +134,23 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               ),
             ),
             if (auth.error != null) ErrorNotice(message: auth.error!),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 0; i < _pages.length; i++)
+                  Container(
+                    width: i == _index ? 22 : 7,
+                    height: 7,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: i == _index ? AppColors.green : AppColors.border,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
             ActionButton(
               key: const Key('welcome-continue'),
               label: _index == 2 ? 'Get started' : 'Next',

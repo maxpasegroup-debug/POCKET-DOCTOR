@@ -37,6 +37,7 @@ test('Phase 7 operations, privacy and persistent MFA', { skip: process.env.AUTH_
     await db.user.update({ where: { id: users[0]!.id }, data: { phone } });
     const identity = new IdentityService(db, { ...env, OTP_MODE: 'development', SESSION_SECRET: randomBytes(32).toString('hex') });
     const challenge = await identity.requestOtp(phone), correlation = randomUUID();
+    assert.ok(challenge.developmentCode, 'Explicit development mode returns the local test code');
     const signedIn = await identity.verifyOtp(challenge.challengeId, challenge.developmentCode, correlation);
     const principal = await identity.verify(signedIn.token); assert.ok(principal);
     const events = await db.adminAuditEvent.findMany({ where: { actorId: users[0]!.id, action: 'ADMIN_LOGIN', requestId: correlation } });

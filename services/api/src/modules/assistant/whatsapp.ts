@@ -114,12 +114,13 @@ export function registerWhatsAppWebhook(app: FastifyInstance, env: Environment, 
     scope.post('/api/v1/integrations/whatsapp/webhook', async r => {
       enabled(); if (!Buffer.isBuffer(r.body) || !validSignature(r.body, r.headers['x-hub-signature-256'], env.WHATSAPP_APP_SECRET)) throw new ApiError(401, 'UNAUTHORIZED', 'Webhook verification failed.');
       let raw: unknown; try { raw = JSON.parse(r.body.toString('utf8')); } catch { throw new ApiError(400, 'INVALID_REQUEST', 'Invalid webhook.'); }
-      const schema = z.object({ object: z.literal('whatsapp_business_account'), entry: z.array(z.object({ changes: z.array(z.object({ field: z.string(), value: z.object({
+      const schema = z.object({ object: z.literal('whatsapp_business_account'), entry: z.array(z.object({ id: z.string().optional(), changes: z.array(z.object({ field: z.literal('messages'), value: z.object({
         metadata: z.object({ phone_number_id: z.string() }), messages: z.array(z.object({ id: z.string().min(1).max(200), from: z.string().regex(/^\d{7,20}$/), timestamp: z.string().regex(/^\d+$/), type: z.string(), text: z.object({ body: z.string().max(2000) }).optional() })).max(10).optional(),
         statuses: z.array(z.object({ id: z.string().min(1).max(160), recipient_id: z.string().regex(/^\d{7,20}$/), status: z.enum(['sent', 'delivered', 'read', 'failed']), timestamp: z.string().regex(/^\d+$/) })).max(30).optional(),
       }) })).max(10) })).max(10) });
       const payload = parse(schema, raw);
       for (const entry of payload.entry) for (const change of entry.changes) {
+        if (env.WHATSAPP_BUSINESS_ID && entry.id !== env.WHATSAPP_BUSINESS_ID) throw new ApiError(403, 'FORBIDDEN', 'Webhook business identity mismatch.');
         if (change.value.metadata.phone_number_id !== env.WHATSAPP_PHONE_NUMBER_ID) throw new ApiError(403, 'FORBIDDEN', 'Webhook identity mismatch.');
         for (const status of change.value.statuses ?? []) await service!.deliveryStatus(status.id, status.recipient_id, status.status, status.timestamp, r.id);
         for (const m of change.value.messages ?? []) {

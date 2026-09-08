@@ -7,6 +7,7 @@ import type { Environment } from './config/env.js';
 import type { Database } from './database/database.js';
 import { ApiError } from './errors/api-error.js';
 import { registerIdentityRoutes } from './modules/auth/routes.js';
+import { registerDoctorSessionRoutes } from './modules/auth/doctor-session.js';
 import { registerProgramRoutes } from './modules/programs/routes.js';
 import { registerConsultationRoutes } from './modules/consultations/routes.js';
 import { registerCommerceRoutes } from './modules/wellness/routes.js';
@@ -16,6 +17,7 @@ import { registerAdminSecurity } from './modules/admin/security.js';
 import { registerAdminRoutes } from './modules/admin/routes.js';
 import { registerPrivacyRoutes } from './modules/privacy/routes.js';
 import { registerNotificationRoutes } from './modules/notifications/routes.js';
+import { registerPushRoutes } from './modules/notifications/push.js';
 import { registerPaymentWebhook } from './modules/payments/webhook.js';
 import { registerRequestBudgets } from './modules/auth/request-budget.js';
 import { ApiMetrics } from './observability.js';
@@ -38,7 +40,7 @@ export async function buildApp(env: Environment, database?: Database) {
   await app.register(helmet);
   await app.register(cors, {
     origin: env.CORS_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean),
-    credentials: false,
+    credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
@@ -80,8 +82,10 @@ export async function buildApp(env: Environment, database?: Database) {
   app.get('/api/v1/admin/operations/metrics', async () => ({ data: { items: metrics.snapshot(), scope: 'This API process since startup' } }));
   registerPrivacyRoutes(app, env, database?.client);
   registerNotificationRoutes(app, env, database?.client);
+  registerPushRoutes(app, env, database?.client);
   registerPaymentWebhook(app, env, database?.client);
   registerIdentityRoutes(app, env, database?.client);
+  registerDoctorSessionRoutes(app, env, database?.client);
   registerProgramRoutes(app, env, database?.client);
   registerConsultationRoutes(app, env, database?.client);
   registerCommerceRoutes(app, env, database?.client);

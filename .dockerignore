@@ -7,9 +7,6 @@
 !apps/admin-console/
 !apps/admin-console/dist/
 !apps/admin-console/dist/**
-!apps/doctor-portal/
-!apps/doctor-portal/dist/
-!apps/doctor-portal/dist/**
 !apps/mobile/
 !apps/mobile/build/
 !apps/mobile/build/web/

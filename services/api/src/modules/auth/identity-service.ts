@@ -4,22 +4,23 @@ import type { Environment } from '../../config/env.js';
 import { ApiError } from '../../errors/api-error.js';
 import { userDto, type ProfileInput } from './profile.js';
 import type { Principal, SessionVerifier } from './contracts.js';
+import { TwilioSmsProvider, type SmsOtpProvider } from './sms-provider.js';
 
 const invalidOtp = () => new ApiError(400, 'INVALID_OTP', 'That code is incorrect or has expired. Please try again or request a new code.');
 const unauthorized = () => new ApiError(401, 'UNAUTHENTICATED', 'Please sign in again.');
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
-// The production delivery adapter is deliberately not implemented. Development
-// mode issues random per-challenge codes, returned only through an opt-in local API.
+// Delivery is configurable; all roles reuse this same OTP and session lifecycle.
 export class IdentityService implements SessionVerifier {
-  constructor(private readonly prisma: PrismaClient, private readonly env: Environment) {}
+  constructor(private readonly prisma: PrismaClient, private readonly env: Environment,
+    private readonly sms: SmsOtpProvider = new TwilioSmsProvider(env)) {}
 
   private otpHash(id: string, code: string) {
     return createHmac('sha256', this.env.SESSION_SECRET).update(`${id}:${code}`).digest('hex');
   }
 
   async requestOtp(phone: string) {
-    if (this.env.OTP_MODE !== 'development' || !['development', 'test'].includes(this.env.APP_ENV)) {
+    if (this.env.OTP_MODE === 'disabled' || (this.env.OTP_MODE === 'development' && !['development', 'test'].includes(this.env.APP_ENV))) {
       throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet. Please try again later.');
     }
     const now = new Date();
@@ -35,14 +36,23 @@ export class IdentityService implements SessionVerifier {
       }
       const data = { id, codeHash: this.otpHash(id, code), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
         windowStartedAt: sameWindow ? old.windowStartedAt : now,
-        requestCount: sameWindow ? old.requestCount + 1 : 1, attempts: 0, consumed: false };
+        requestCount: sameWindow ? old.requestCount + 1 : 1, attempts: 0, consumed: this.env.OTP_MODE === 'provider' };
       await tx.otpChallenge.upsert({ where: { phone }, create: { phone, ...data }, update: data });
     });
+    if (this.env.OTP_MODE === 'provider') {
+      try { await this.sms.send(phone, code); }
+      catch {
+        await this.prisma.otpChallenge.updateMany({ where: { id }, data: { consumed: true, codeHash: '0'.repeat(64) } });
+        throw new ApiError(503, 'OTP_UNAVAILABLE', 'We could not send a verification code. Please wait a moment and request a new code.');
+      }
+      await this.prisma.otpChallenge.updateMany({ where: { id }, data: { consumed: false } });
+      return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, delivery: 'provider' as const };
+    }
     return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, developmentCode: code, delivery: 'development' as const };
   }
 
   async verifyOtp(challengeId: string, code: string, requestId: string = randomUUID()) {
-    if (this.env.OTP_MODE !== 'development') throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet.');
+    if (this.env.OTP_MODE === 'disabled') throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet.');
     const token = randomBytes(32).toString('base64url');
     const result = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "OtpChallenge" WHERE "id" = ${challengeId}::uuid FOR UPDATE`;

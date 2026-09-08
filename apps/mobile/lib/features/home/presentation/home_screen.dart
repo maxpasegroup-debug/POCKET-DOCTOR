@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/foundation_widgets.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
+import '../../../shared/widgets/service_tile.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../programs/presentation/home_programs.dart';
 import '../../consultation/presentation/appointment_screen.dart';
@@ -22,79 +23,117 @@ class HomeScreen extends ConsumerWidget {
         : 'Good evening';
     return PageBody(
       children: [
-        Text(
-          '$greeting, ${user?.firstName ?? 'there'}',
-          style: Theme.of(context).textTheme.titleMedium,
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$greeting, ${user?.firstName ?? 'there'}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Your health, our priority.'),
+                ],
+              ),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Your profile',
+              onPressed: () => context.go('/profile'),
+              icon: const Icon(Icons.person_outline_rounded),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Your health journey\nstarts here.',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'A little learning. A little action. A little more care for yourself.',
-        ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
         FoundationCard(
-          color: AppColors.mint,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StatusPill(label: 'YOUR PERSONAL SPACE'),
-              const SizedBox(height: 16),
               Text(
-                'A fresh start, at your pace.',
-                style: Theme.of(context).textTheme.titleLarge,
+                'Your Health Journey',
+                style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Your profile is ready. Explore your programs and learning progress below, at your own pace.',
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppColors.mint,
+                    child: Icon(
+                      Icons.favorite_border_rounded,
+                      color: AppColors.green,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Your health journey\nstarts here.',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              OutlinedButton(
+              const SizedBox(height: 8),
+              TextButton(
                 onPressed: () => context.push('/health'),
                 child: const Text('Explore My Health'),
               ),
             ],
           ),
         ),
-        const MembershipHomeCard(),
-        const PageSection(
-          'Care for every part of you',
-          subtitle: 'Four ways to learn, find guidance and feel supported.',
+        const PageSection('Care for every part of you'),
+        ServiceGrid(
+          children: [
+            ServiceTile(
+              key: const Key('service-programs'),
+              title: 'Learn & Transform',
+              icon: Icons.school_outlined,
+              color: AppColors.green,
+              background: AppColors.mint,
+              onTap: () => context.go('/programs'),
+            ),
+            ServiceTile(
+              key: const Key('service-consult'),
+              title: 'Talk to a Doctor',
+              icon: Icons.medical_services_outlined,
+              color: AppColors.information,
+              background: AppColors.sky,
+              onTap: () => context.go('/consult'),
+            ),
+            ServiceTile(
+              key: const Key('service-shop'),
+              title: 'Wellness Medicines',
+              icon: Icons.spa_outlined,
+              color: AppColors.violet,
+              background: AppColors.lavender,
+              onTap: () => context.push('/wellness'),
+            ),
+            ServiceTile(
+              key: const Key('service-assistant'),
+              title: 'AI Health Assistant',
+              icon: Icons.smart_toy_outlined,
+              color: AppColors.green,
+              background: AppColors.mint,
+              onTap: () => context.go('/assistant'),
+            ),
+          ],
         ),
-        PreviewTile(
-          key: const Key('service-programs'),
-          title: 'Learn & Transform',
-          description: 'Doctor-led programs for body and mind.',
-          icon: Icons.auto_stories_outlined,
-          label: 'LEARN',
-          onTap: () => context.go('/programs'),
-        ),
-        PreviewTile(
-          key: const Key('service-consult'),
-          title: 'Talk to a Doctor',
-          description: 'Professional guidance, when you need it.',
-          icon: Icons.medical_services_outlined,
-          label: 'CONSULT',
-          onTap: () => context.go('/consult'),
-        ),
-        PreviewTile(
-          key: const Key('service-shop'),
-          title: 'Wellness',
-          description: 'Carefully selected products for your daily routine.',
-          icon: Icons.spa_outlined,
-          label: 'SUPPORT',
-          onTap: () => context.push('/wellness'),
-        ),
-        PreviewTile(
-          key: const Key('service-assistant'),
-          title: 'AI Health Assistant',
-          description: 'Your companion for everyday wellness and consistency.',
-          icon: Icons.chat_bubble_outline,
-          label: 'TRACK',
-          onTap: () => context.go('/assistant'),
+        const SizedBox(height: 20),
+        ListTile(
+          tileColor: AppColors.sky,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          leading: const Icon(
+            Icons.wb_sunny_outlined,
+            color: AppColors.information,
+          ),
+          title: const Text('A moment for you'),
+          subtitle: const Text('Check in with yourself today.'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.push('/assistant/check-ins'),
         ),
         const PageSection('Continue your journey'),
         Text(
@@ -108,6 +147,7 @@ class HomeScreen extends ConsumerWidget {
         ),
         const HomePrograms(),
         const HomeConsultations(),
+        const MembershipHomeCard(),
       ],
     );
   }

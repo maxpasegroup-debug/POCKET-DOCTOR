@@ -1,7 +1,7 @@
 # Pocket Doctor admin console
 
-Phase 7 operations application, using the same Vite + TypeScript architecture as
-the doctor portal. It connects to the existing versioned REST API. There is no
+Phase 7 operations application, built with Vite + TypeScript and connected to
+the existing versioned REST API. There is no
 sample data or frontend authority to assign roles, verify payment success, read
 clinical notes, inspect AI conversations or mark refunds complete.
 

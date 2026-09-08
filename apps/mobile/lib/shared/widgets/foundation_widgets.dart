@@ -11,9 +11,7 @@ class PageBody extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: AppSpacing.contentWidth),
         child: Padding(
           padding: EdgeInsets.all(
-            MediaQuery.sizeOf(context).width < 600
-                ? AppSpacing.lg
-                : AppSpacing.xxl,
+            MediaQuery.sizeOf(context).width < 600 ? 20 : AppSpacing.xxl,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,11 +42,11 @@ class SectionHeading extends StatelessWidget {
           letterSpacing: 1.4,
         ),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 10),
       Text(title, style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 12),
       Text(description, style: Theme.of(context).textTheme.bodyLarge),
-      const SizedBox(height: 32),
+      const SizedBox(height: 24),
     ],
   );
 }
@@ -60,7 +58,7 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: AppColors.mint,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(20),
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -83,15 +81,16 @@ class FoundationCard extends StatelessWidget {
   final Widget child;
   final Color color;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
+    child: Material(
       color: color,
-      border: Border.all(color: AppColors.border),
-      borderRadius: BorderRadius.circular(20),
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.border),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(padding: const EdgeInsets.all(20), child: child),
     ),
-    child: child,
   );
 }
 

@@ -35,7 +35,7 @@ npm run dev
 
 The consultation seed reuses the demo professional associated with the programs.
 It links a synthetic doctor account, `+919999900303`, to that profile. Request its
-random development OTP through the doctor portal; there is no fixed code. The
+random development OTP through the existing auth API; there is no fixed code. The
 seed refuses to replace a real doctor or another account assignment. Existing
 availability/profile preferences are preserved on repeat runs.
 
@@ -49,8 +49,8 @@ flutter run -d chrome --web-port=8080 --dart-define=API_BASE_URL=http://127.0.0.
 
 Android emulator uses `http://10.0.2.2:3000/api/v1`. Demo servers bind to loopback;
 physical-device networking needs a separately secured development arrangement.
-For the separate web portal, see [doctor portal setup](../apps/doctor-portal/README.md).
-Its API base and local development-code switch are build configuration, never secrets.
+The separate Doctor Portal web app has since been removed; backend doctor and
+consultation APIs remain available.
 
 ## Doctor identity and verification
 
@@ -234,7 +234,7 @@ Rescheduling uses the booking screen with an appointment reference. Existing
 GoRouter auth guards protect all new routes. Bottom navigation stays unchanged.
 Home links to discovery and shows at most one upcoming reservation.
 
-The separate doctor portal in `apps/doctor-portal` uses a small Vite/TypeScript DOM
+Historical Phase 3 implementation: the subsequently removed doctor portal used a small Vite/TypeScript DOM
 application, with no extra state-management framework. The reserved Phase 0 portal
 had no executable framework to preserve; this avoids a second server when the
 existing versioned backend owns all business operations. It includes an agenda,
@@ -254,9 +254,6 @@ flutter analyze
 flutter test --concurrency=1 --dart-define=RUN_API_SMOKE=true --dart-define=RUN_AUTH_SMOKE=true --dart-define=RUN_PROGRAM_SMOKE=true --dart-define=RUN_CONSULTATION_SMOKE=true
 flutter build apk --debug
 flutter build web --debug
-cd ../doctor-portal
-npm test
-npm run build
 ```
 
 See [validation evidence](phase-3-validation.md) for actual results and

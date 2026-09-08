@@ -58,6 +58,8 @@ model PrivacyRequest {
 }
 // Single inbox/outbox references existing domain events without copying health data.
 model Notification {
+  pushDeviceId String? @db.Uuid
+  pushDevice PushDevice? @relation(fields: [pushDeviceId], references: [id], onDelete: SetNull)
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -235,6 +237,7 @@ enum Role {
 
 // Basic identity only; no medical history or clinical records.
 model User {
+  pushDevices PushDevice[]
   accountStatus String @default("ACTIVE") @db.VarChar(20)
   privacyRequests PrivacyRequest[]
   notificationInbox Notification[]
@@ -410,6 +413,7 @@ model OtpChallenge {
 }
 
 model Session {
+  pushDevice PushDevice?
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
   tokenHash String @unique @db.VarChar(64)
@@ -418,6 +422,22 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
   @@index([expiresAt])
+}
+
+model PushDevice {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String @unique @db.Uuid
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash String @unique @db.VarChar(64)
+    tokenEncrypted String
+  platform String @db.VarChar(10)
+  enabled Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+    updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  notifications Notification[]
+  @@index([userId])
 }
 
 enum ProgramType {

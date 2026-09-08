@@ -2,12 +2,16 @@
 
 ## Phase 7 operations and release boundaries
 
-The new admin console joins Flutter and the doctor portal on the same Fastify
+The admin console and Flutter app use the same Fastify
 `/api/v1` boundary. Identity and the shared EnrollmentPayment ledger remain
 authoritative. A global administrative gate adds ADMIN authorization, durable
 TOTP step-up and minimal append-only audit evidence across old and new routes.
 Account status is checked on every session validation. Persistent per-account
 action budgets complement existing IP/OTP/AI protections.
+
+The separate Doctor Portal web app has been removed. Backend doctor identity,
+profile, session and consultation authorization contracts remain available;
+there is no bundled doctor-facing web client or deployment target.
 
 Privacy APIs expose versioned, separate consent choices, owner-scoped paginated
 exports and an access-deletion request that preserves records for approved
@@ -50,7 +54,7 @@ work at the end of Phase 6; Phase 7 status is documented above.
 
 ## Phase 5 assistant extension
 
-The current system includes the Flutter app, the existing doctor portal and the
+The current system includes the Flutter app, Admin Console and the
 modular Fastify API. The assistant extends this API and PostgreSQL database;
 it does not replace any Phase 0–4 subsystem. The older sections below describe
 the architecture as it evolved.
@@ -78,16 +82,15 @@ implementation, and [security review](phase-5-review.md) for its practical limit
 ```mermaid
 flowchart LR
   Mobile[Flutter user app] -->|REST /api/v1| API[Node / Fastify]
-  Doctor[Future doctor portal] -.-> API
-  Admin[Future admin console] -.-> API
+  Admin[Admin Console] -->|REST /api/v1| API
   API --> Prisma
   Prisma --> DB[(PostgreSQL)]
   API -.-> Provider[Future production OTP and service adapters]
 ```
 
 Phase 0 architecture is preserved: a modular REST backend, one PostgreSQL database,
-feature-oriented Flutter, Riverpod, go_router and package:http. Doctor/admin web
-directories remain documentation-only. They will use the same API and must not
+feature-oriented Flutter, Riverpod, go_router and package:http. The Admin Console
+uses the same API and must not
 access the database from browser code. No Next.js framework or microservice was
 introduced unnecessarily.
 
@@ -245,9 +248,8 @@ states. No provider connection or real charge is presented as operational.
 
 Flutter extends the consultation feature using the existing package:http client,
 Riverpod providers and GoRouter auth guards. The five bottom tabs remain unchanged.
-The separate minimum doctor portal is a small Vite/TypeScript web app; it shares
-identity and domain APIs, stores browser sessions only in memory and clears private
-state on unauthorized responses. It does not connect directly to PostgreSQL.
+Doctor-specific identity and domain APIs retain their server-side role and
+ownership checks. The separate doctor web application has been removed.
 
 See [Phase 3 architecture and contracts](phase-3.md) for verification operations,
 state transitions, content privacy, provider boundaries and validation commands.

@@ -4,6 +4,7 @@ import { readEnvironment } from './config/env.js';
 import { createDatabase } from './database/database.js';
 import { collectNotifications } from './modules/notifications/service.js';
 import { deliverNotifications } from './modules/notifications/delivery.js';
+import { deliverPush } from './modules/notifications/push.js';
 import { MembershipService } from './modules/membership/membership-service.js';
 import { CommerceService } from './modules/wellness/commerce-service.js';
 
@@ -26,7 +27,8 @@ async function main() {
         const collected = await collectNotifications(db.client!);
         // No external sending occurs unless explicitly configured and consented.
         const delivery = await deliverNotifications(db.client!, env);
-        console.log(JSON.stringify({ event: 'worker_cycle', requestId, collected: collected.collected, attempted: delivery.attempted }));
+        const push = await deliverPush(db.client!, env);
+        console.log(JSON.stringify({ event: 'worker_cycle', requestId, collected: collected.collected, attempted: delivery.attempted + push.attempted }));
       } catch { console.error(JSON.stringify({ event: 'worker_cycle_failed', requestId })); if (process.argv.includes('--once')) process.exitCode = 1; }
       if (process.argv.includes('--once') || stopped) break;
       await new Promise<void>(resolve => {

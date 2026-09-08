@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/foundation_widgets.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../application/membership_providers.dart';
@@ -43,7 +44,7 @@ class MembershipBenefits extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.check_circle_outline, size: 24),
+              const Icon(Icons.check_circle, size: 24, color: AppColors.green),
               const SizedBox(width: 12),
               Expanded(child: Text(label)),
             ],

@@ -7,6 +7,10 @@ wellbeing and everyday wellness: **Learn → Act → Track → Consult → Suppo
 
 ## Phase 7: Operations, security and production readiness
 
+The Doctor Portal web application has been removed from this project. The
+supported clients are the Flutter user app and Admin Console. Backend doctor
+roles, profiles and consultation APIs remain available for existing workflows.
+
 The admin control center, durable audit/MFA controls, account status management,
 privacy/consent/export screens, unified inbox and notification worker now extend
 the existing platform. Provider adapters and deployment/recovery procedures are
@@ -22,8 +26,8 @@ The admin console lives in `apps/admin-console`; use `npm ci`, an explicit
 there is no default credential. Backend `npm run worker` starts bounded inbox
 collection/delivery cycles. External channels remain disabled unless configured.
 
-Validate with API `npm test`, `npm run typecheck`, `npm run db:validate`; both
-portals `npm test` and `npm run build`; Flutter `flutter analyze`, `flutter test`,
+Validate with API `npm test`, `npm run typecheck`, `npm run db:validate`; Admin
+Console `npm test` and `npm run build`; Flutter `flutter analyze`, `flutter test`,
 Android debug and explicit production-configured web/release builds. Run
 `node ops/scan-secrets.mjs` and `node --test ops/test/*.test.mjs` at the repository
 root. Exact commands, all API smoke flags, limits and evidence are in the
@@ -51,7 +55,7 @@ No new credentials are needed; the existing `PAYMENT_MODE` guard applies.
 Flutter uses the existing run configuration. Open Membership from Home or
 Profile, select a plan, review the server quote, optionally apply a coupon,
 complete the labeled demo payment, and manage benefits/cancellation/receipts.
-Run `flutter analyze`, `flutter test`, API `npm test`, and doctor portal
+Run `flutter analyze`, `flutter test`, API `npm test`, and Admin Console
 `npm test`/`npm run build`. Real membership API smoke testing additionally uses
 `--dart-define=RUN_MEMBERSHIP_SMOKE=true` with the existing smoke flags and a
 loopback `API_BASE_URL`; see the validation document for the exact commands.
@@ -101,8 +105,8 @@ See [Phase 4 architecture and operations](docs/phase-4.md),
 
 Talk to a Doctor now includes doctor discovery, server-generated slots, reservation
 review, payment state, confirmation, rescheduling, cancellation, records and history.
-The minimum doctor web portal manages its own agenda, availability, bio, notes and
-follow-up. Booking concurrency and paid confirmation are enforced in PostgreSQL.
+Backend doctor APIs manage agenda, availability, bio, notes and follow-up.
+Booking concurrency and paid confirmation are enforced in PostgreSQL.
 Existing program, identity and payment architecture is reused.
 
 **Live video/audio/chat and real-money payments are not enabled.** The app clearly
@@ -110,8 +114,7 @@ labels provider-ready reservations and local DEMO accounts. No real consultation
 doctor credential, refund or medical outcome is simulated as fact.
 
 See [Phase 3 setup, architecture and APIs](docs/phase-3.md),
-[validation evidence](docs/phase-3-validation.md), and
-[doctor portal instructions](apps/doctor-portal/README.md). Local consultation
+[validation evidence](docs/phase-3-validation.md). Local consultation
 validation requires `DEMO_CONSULTATIONS=true`, `PAYMENT_MODE=development`, database
 migrations and `npm run consultations:seed`. Demo flags are rejected in
 staging/production. The existing Flutter run commands remain valid.
@@ -154,7 +157,7 @@ AI replies, prescriptions, WhatsApp or push delivery is implemented.
 Flutter 3.44 / Dart 3.12, Riverpod, go_router and the existing package:http client.
 Android + iOS architecture; web is a validation target. Node 24 LTS, TypeScript,
 Fastify, Prisma 7 and PostgreSQL 17+ remain the Phase 0 backend.
-The small doctor portal uses Vite and TypeScript with the same REST backend;
+The Admin Console uses Vite and TypeScript with the same REST backend;
 Flutter continues to use Riverpod exclusively.
 
 ```text
@@ -170,8 +173,7 @@ services/api/
   prisma/            Identity/profile/session schema and ordered migrations
   test/              Foundation and PostgreSQL identity integration tests
 docs/                Architecture, API, security, design and phase reports
-apps/doctor-portal/  Doctor agenda, availability, notes and profile web app
-apps/admin-console/ Future web boundary only
+apps/admin-console/ Operations and administration web app
 ```
 
 No approved logo has been supplied. Place it exactly as described in

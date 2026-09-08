@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/service_tile.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../../auth/application/auth_controller.dart';
 
@@ -18,7 +20,40 @@ class HealthScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'A personal space for everyday wellness. No medical scores, diagnoses or clinical interpretations.',
+          'Your health, your control. Make space for the habits that matter to you.',
+        ),
+        const SizedBox(height: 24),
+        ServiceGrid(
+          children: [
+            ServiceTile(
+              title: 'Manage wellness goals',
+              icon: Icons.flag_outlined,
+              color: AppColors.green,
+              background: AppColors.mint,
+              onTap: () => context.push('/assistant/goals'),
+            ),
+            ServiceTile(
+              title: 'Daily check-in',
+              icon: Icons.wb_sunny_outlined,
+              color: AppColors.information,
+              background: AppColors.sky,
+              onTap: () => context.push('/assistant/check-ins'),
+            ),
+            ServiceTile(
+              title: 'View My Programs',
+              icon: Icons.auto_stories_outlined,
+              color: AppColors.violet,
+              background: AppColors.lavender,
+              onTap: () => context.push('/my-programs'),
+            ),
+            ServiceTile(
+              title: 'My reminders',
+              icon: Icons.notifications_none_rounded,
+              color: AppColors.green,
+              background: AppColors.mint,
+              onTap: () => context.push('/assistant/reminders'),
+            ),
+          ],
         ),
         const PageSection('Wellness interests'),
         if (user?.interests.isNotEmpty == true)
@@ -40,27 +75,15 @@ class HealthScreen extends ConsumerWidget {
           'Health goals',
           subtitle: 'Choose a personal goal and update your own progress.',
         ),
-        OutlinedButton(
-          onPressed: () => context.push('/assistant/goals'),
-          child: const Text('Manage wellness goals'),
-        ),
         const PageSection(
           'Daily habits',
           subtitle:
               'Reflect with an optional check-in. Nothing is tracked automatically.',
         ),
-        OutlinedButton(
-          onPressed: () => context.push('/assistant/check-ins'),
-          child: const Text('Daily check-in'),
-        ),
         const PageSection(
           'Program activity',
           subtitle:
               'Your enrolled programs and saved learning progress are in My Programs.',
-        ),
-        OutlinedButton(
-          onPressed: () => context.push('/my-programs'),
-          child: const Text('View My Programs'),
         ),
       ],
     );

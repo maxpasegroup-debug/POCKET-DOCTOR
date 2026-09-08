@@ -32,8 +32,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     return AuthPage(
-      title: 'Your personal health space.',
-      description: 'Sign in or get started with your mobile number.',
+      title: 'Welcome to Pocket Doctor',
+      description: 'Sign in to continue your health journey.',
       children: [
         Form(
           key: _form,
@@ -51,7 +51,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               labelText: 'Mobile number',
               prefixText: '+91  ',
               helperText: 'India · 10-digit mobile number',
-              border: OutlineInputBorder(),
             ),
             validator: PhoneNumber.validate,
             onFieldSubmitted: (_) => _submit(),

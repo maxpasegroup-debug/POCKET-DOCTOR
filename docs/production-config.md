@@ -1,5 +1,14 @@
 # Production configuration inventory
 
+P7-A additions and current limitations are documented in
+[provider configuration](provider-configuration.md) and the
+[P7-A closure evidence](p7-a-provider-closure.md). Optional Twilio SMS, Resend
+email and FCM push adapters are disabled by default. No real provider delivery or
+sandbox payment has been validated. `OTP_MODE=provider` now supports the existing
+identity flow when an approved SMS sender is explicitly configured. The Doctor
+Portal web app has been removed; its backend session contract is retained but
+there is no doctor web build or deployment target.
+
 No real credentials belong in this document, source control, Flutter defines,
 portal Vite variables, screenshots or logs. `.env.example` is a reference;
 deployment secrets must come from the platform secret store. Development,
@@ -17,9 +26,9 @@ after review; serialize reviewed metadata into `LEGAL_DOCUMENTS`.
 | `DATABASE_URL` | Private PostgreSQL connection for a least-privilege runtime login; migration owner kept separate |
 | `SESSION_SECRET` | Random backend-only secret, at least 32 characters; rotate with a documented session/OTP invalidation procedure |
 | `HOST`, `PORT`, `LOG_LEVEL` | Platform service binding, injected port, production info/warn logging |
-| `CORS_ORIGINS` | Exact approved HTTPS user-web, doctor and admin origins; no wildcard |
+| `CORS_ORIGINS` | Exact approved HTTPS user-web and admin origins; no wildcard; remove retired portal origins |
 | `TRUSTED_PROXY_CIDRS` | Only verified ingress IPs/CIDRs; empty distrusts forwarding headers. `/0` and `true` are rejected. Validate forwarding-header stripping at the actual ingress. |
-| `OTP_MODE` | `disabled` in deployed environments until a real SMS provider adapter is implemented; development is rejected |
+| `OTP_MODE` | `disabled` until sender acceptance, or `provider` with the approved Twilio configuration documented in provider-configuration.md; development is rejected in deployments |
 | `ADMIN_SECURITY_MODE` | `totp` after provisioning/testing, or `disabled`; development is rejected in deployments |
 | `ADMIN_TOTP_KEYS` | Secret JSON mapping existing admin UUIDs to separate base32 keys; provision out of band; no shared/default key |
 | `LEGAL_DOCUMENTS` | Versioned HTTPS document metadata with explicit approved flags after business/legal review |
@@ -45,8 +54,8 @@ validates compilation only. Release startup refuses development environment or
 development OTP. Never put payment, AI, database, session or provider secrets in
 client configuration.
 
-Both portals require `VITE_API_BASE_URL=https://<approved-api>/api/v1` for the
-production build/runtime. Doctor portal development OTP must be false; admin
+The Admin Console requires `VITE_API_BASE_URL=https://<approved-api>/api/v1` for the
+production build/runtime; admin
 development OTP display is confined to local development. Vite values are public.
 
 Android release signing reads `PD_KEYSTORE_FILE`, `PD_KEYSTORE_PASSWORD`,
@@ -58,8 +67,8 @@ iOS requires macOS/Xcode, owned bundle/team IDs and private signing profiles.
 
 ## Deployment services
 
-Deploy separately: API, worker, PostgreSQL, customer web if required, doctor
-portal, admin console. API/worker use `services/api/Dockerfile` and distinct
+Deploy separately: API, worker, PostgreSQL, customer web if required, and Admin
+Console. API/worker use `services/api/Dockerfile` and distinct
 Railway service definitions. Migration execution is deliberately separate from
 application rollout. Verify database backups and review each additive migration
 first. Do not deploy using a database owner/superuser.

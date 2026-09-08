@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/foundation_widgets.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../application/assistant_providers.dart';
@@ -21,9 +22,20 @@ class AssistantScreen extends ConsumerWidget {
               'A calm space to reflect, remember and take your next step.',
         ),
         FoundationCard(
+          color: AppColors.sky,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const CircleAvatar(
+                backgroundColor: Colors.white,
+                radius: 26,
+                child: Icon(
+                  Icons.smart_toy_outlined,
+                  color: AppColors.information,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(
                 'What would help today?',
                 style: Theme.of(context).textTheme.titleLarge,

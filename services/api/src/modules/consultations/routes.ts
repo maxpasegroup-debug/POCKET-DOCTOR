@@ -5,6 +5,7 @@ import type { Environment } from '../../config/env.js';
 import { ApiError } from '../../errors/api-error.js';
 import { authenticate, authorize } from '../auth/authorization.js';
 import { IdentityService } from '../auth/identity-service.js';
+import { authenticateDoctor } from '../auth/doctor-session.js';
 import { ConsultationService } from './consultation-service.js';
 import { availabilityInput, localDate } from './availability.js';
 
@@ -20,7 +21,7 @@ export function registerConsultationRoutes(app: FastifyInstance, env: Environmen
   const identity = db ? new IdentityService(db, env) : undefined;
   async function context(request: FastifyRequest, doctor = false) {
     if (!service || !identity) throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'Consultations are unavailable right now.');
-    const principal = await authenticate(request, identity);
+    const principal = doctor ? await authenticateDoctor(request, identity, env) : await authenticate(request, identity);
     authorize(principal, doctor ? ['DOCTOR'] : ['USER']);
     return { service, userId: principal.userId };
   }
@@ -72,6 +73,14 @@ export function registerConsultationRoutes(app: FastifyInstance, env: Environmen
   app.get('/api/v1/doctor/appointments', async request => {
     const { service, userId } = await context(request, true);
     return { data: { consultations: await service.doctorAppointments(userId) } };
+  });
+  app.post('/api/v1/me/consultations/:id/access', async request => {
+    const { service, userId } = await context(request); empty(request);
+    return { data: await service.sessionAccess(userId, id(request), 'patient') };
+  });
+  app.post('/api/v1/doctor/consultations/:id/access', async request => {
+    const { service, userId } = await context(request, true); empty(request);
+    return { data: await service.sessionAccess(userId, id(request), 'doctor') };
   });
   app.get('/api/v1/doctor/availability', async request => {
     const { service, userId } = await context(request, true);

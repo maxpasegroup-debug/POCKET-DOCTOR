@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../membership/presentation/membership_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/foundation_widgets.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../../auth/application/auth_controller.dart';
@@ -24,20 +25,35 @@ class ProfileScreen extends ConsumerWidget {
             message: auth.error!,
             onRetry: ref.read(authProvider.notifier).revalidateSession,
           ),
-        const SectionHeading(
-          eyebrow: 'Your space',
-          title: 'Health, on your terms.',
-          description: 'Your profile and preferences, all in one place.',
+        Text(
+          'Health, on your terms.',
+          style: Theme.of(context).textTheme.titleLarge,
         ),
+        const SizedBox(height: 20),
         FoundationCard(
+          color: AppColors.sky,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.person_outline, size: 40),
-              const SizedBox(height: 16),
-              Text(
-                user.fullName ?? 'Complete your profile',
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.person_outline,
+                      size: 30,
+                      color: AppColors.information,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      user.fullName ?? 'Complete your profile',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               SelectableText(user.phone),
@@ -53,7 +69,66 @@ class ProfileScreen extends ConsumerWidget {
             ],
           ),
         ),
-        const MembershipHomeCard(),
+        const SizedBox(height: 20),
+        FoundationCard(
+          child: Column(
+            children: [
+              for (final item in [
+                (
+                  title: 'My Health',
+                  icon: Icons.favorite_border,
+                  route: '/health',
+                ),
+                (
+                  title: 'My Consultations',
+                  icon: Icons.medical_services_outlined,
+                  route: '/my-consultations',
+                ),
+                (
+                  title: 'My Programs',
+                  icon: Icons.auto_stories_outlined,
+                  route: '/my-programs',
+                ),
+                (
+                  title: 'My Orders',
+                  icon: Icons.shopping_bag_outlined,
+                  route: '/orders',
+                ),
+                (
+                  title: 'Membership',
+                  icon: Icons.workspace_premium_outlined,
+                  route: '/membership',
+                ),
+                (
+                  title: 'Notifications',
+                  icon: Icons.notifications_outlined,
+                  route: '/notifications',
+                ),
+                (
+                  title: 'Settings',
+                  icon: Icons.settings_outlined,
+                  route: '/settings',
+                ),
+                (
+                  title: 'Help & Support',
+                  icon: Icons.help_outline,
+                  route: '/settings/help',
+                ),
+              ])
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    item.icon,
+                    color: AppColors.information,
+                    size: 22,
+                  ),
+                  title: Text(item.title),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: () => context.push(item.route),
+                ),
+            ],
+          ),
+        ),
         const PageSection('Wellness interests'),
         if (user.interests.isEmpty)
           const Text(
@@ -69,34 +144,7 @@ class ProfileScreen extends ConsumerWidget {
             ],
           ),
         const SizedBox(height: 24),
-        PreviewTile(
-          title: 'My Orders',
-          description: 'Your wellness purchases and delivery updates.',
-          icon: Icons.shopping_bag_outlined,
-          label: '',
-          onTap: () => context.push('/orders'),
-        ),
-        PreviewTile(
-          title: 'My Health',
-          description: 'Your interests and future health journey.',
-          icon: Icons.favorite_border,
-          label: '',
-          onTap: () => context.push('/health'),
-        ),
-        PreviewTile(
-          title: 'Notifications',
-          description: 'Reminders and updates, when they arrive.',
-          icon: Icons.notifications_outlined,
-          label: '',
-          onTap: () => context.push('/notifications'),
-        ),
-        PreviewTile(
-          title: 'Settings',
-          description: 'Preferences, privacy and account options.',
-          icon: Icons.settings_outlined,
-          label: '',
-          onTap: () => context.push('/settings'),
-        ),
+        const MembershipHomeCard(),
       ],
     );
   }

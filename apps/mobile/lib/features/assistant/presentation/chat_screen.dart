@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/foundation_widgets.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../application/assistant_providers.dart';
@@ -89,14 +90,23 @@ class _ChatState extends ConsumerState<AssistantChatScreen> {
                     ),
                   ],
                   for (final turn in chat.messages) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Text(
-                        'You\n${turn.prompt}',
-                        style: Theme.of(context).textTheme.bodyLarge,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.mint,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Text(
+                          'You\n${turn.prompt}',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                       ),
                     ),
                     FoundationCard(
+                      color: AppColors.sky,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

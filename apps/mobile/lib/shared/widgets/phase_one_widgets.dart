@@ -86,17 +86,19 @@ class AuthPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const BrandLockup(showTagline: true),
+                  const Center(child: BrandLockup(showTagline: true)),
                   const SizedBox(height: 48),
                   Text(
                     title,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 12),
                   Text(
                     description,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 32),
@@ -151,7 +153,7 @@ Future<void> showFutureFeature(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const StatusPill(label: 'Coming soon'),
             const SizedBox(height: 20),

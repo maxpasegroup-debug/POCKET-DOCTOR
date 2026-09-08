@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isIP } from 'node:net';
+import { createPrivateKey } from 'node:crypto';
 
 const schema = z.object({
   APP_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
@@ -11,7 +12,18 @@ const schema = z.object({
     z.string().url().refine(value => /^postgres(ql)?:\/\//.test(value)).optional()),
   CORS_ORIGINS: z.string().default(''),
   TRUSTED_PROXY_CIDRS: z.string().default(''),
-  OTP_MODE: z.enum(['disabled', 'development']).default('disabled'),
+  OTP_MODE: z.enum(['disabled', 'development', 'provider']).default('disabled'),
+  SMS_PROVIDER: z.enum(['disabled', 'twilio']).default('disabled'),
+  TWILIO_ACCOUNT_SID: z.string().default(''),
+  TWILIO_AUTH_TOKEN: z.string().default(''),
+  TWILIO_MESSAGING_SERVICE_SID: z.string().default(''),
+  SMS_OTP_TEMPLATE: z.string().max(300).default(''),
+  EMAIL_PROVIDER: z.enum(['disabled', 'resend']).default('disabled'),
+  RESEND_API_KEY: z.string().default(''),
+  EMAIL_FROM: z.string().default(''),
+  PUSH_PROVIDER: z.enum(['disabled', 'fcm']).default('disabled'),
+  FCM_SERVICE_ACCOUNT_JSON: z.string().default(''),
+  NOTIFICATION_ENCRYPTION_KEY: z.string().default(''),
   PAYMENT_MODE: z.enum(['disabled', 'development']).default('disabled'),
   DEMO_PROGRAMS: z.enum(['true', 'false']).default('false'),
   DEMO_CONSULTATIONS: z.enum(['true', 'false']).default('false'),
@@ -39,8 +51,24 @@ const schema = z.object({
   WHATSAPP_APP_SECRET: z.string().default(''),
   WHATSAPP_VERIFY_TOKEN: z.string().default(''),
   WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
+  WHATSAPP_BUSINESS_ID: z.string().regex(/^\d*$/).default(''),
 }).superRefine((env, ctx) => {
   const deployed = env.APP_ENV === 'staging' || env.APP_ENV === 'production';
+  if (env.EMAIL_PROVIDER === 'resend' && (env.RESEND_API_KEY.length < 16 || !z.email().safeParse(env.EMAIL_FROM).success))
+    ctx.addIssue({ code: 'custom', path: ['EMAIL_PROVIDER'], message: 'Configure a verified sender and provider key' });
+  if (env.PUSH_PROVIDER === 'fcm') {
+    try {
+      const account = z.object({ project_id: z.string().regex(/^[a-z][a-z0-9-]{4,62}$/), client_email: z.email().refine(value => value.endsWith('.gserviceaccount.com')), private_key: z.string() }).parse(JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON));
+      if (createPrivateKey(account.private_key).asymmetricKeyType !== 'rsa') throw new Error();
+    } catch { ctx.addIssue({ code: 'custom', path: ['FCM_SERVICE_ACCOUNT_JSON'], message: 'Configure the Firebase service account' }); }
+    if (!/^[A-Za-z0-9+/]{43}=$/.test(env.NOTIFICATION_ENCRYPTION_KEY))
+      ctx.addIssue({ code: 'custom', path: ['NOTIFICATION_ENCRYPTION_KEY'], message: 'Use a private 32-byte base64 key' });
+  }
+  if (env.OTP_MODE === 'provider' && (env.SMS_PROVIDER !== 'twilio' || !/^AC[0-9a-fA-F]{32}$/.test(env.TWILIO_ACCOUNT_SID)
+    || env.TWILIO_AUTH_TOKEN.length < 32 || !/^MG[0-9a-fA-F]{32}$/.test(env.TWILIO_MESSAGING_SERVICE_SID)
+    || env.SMS_OTP_TEMPLATE.split('{code}').length !== 2)) {
+    ctx.addIssue({ code: 'custom', path: ['SMS_PROVIDER'], message: 'Configure the approved SMS sender and OTP template' });
+  }
   for (const value of env.TRUSTED_PROXY_CIDRS.split(',').map(v => v.trim()).filter(Boolean)) {
     const [address, mask, extra] = value.split('/'), family = isIP(address ?? '');
     if (!family || extra !== undefined || (mask !== undefined && (!/^\d+$/.test(mask) || Number(mask) < 1 || Number(mask) > (family === 4 ? 32 : 128)))) {
@@ -86,7 +114,7 @@ const schema = z.object({
   if (env.OTP_MODE === 'development' && (deployed || env.NODE_ENV === 'production')) {
     ctx.addIssue({ code: 'custom', path: ['OTP_MODE'], message: 'Development OTP is forbidden in deployments' });
   }
-  if (env.OTP_MODE === 'development' && env.SESSION_SECRET.length < 32) {
+  if (env.OTP_MODE !== 'disabled' && env.SESSION_SECRET.length < 32) {
     ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Use at least 32 random characters' });
   }
   if (deployed && !env.DATABASE_URL) {

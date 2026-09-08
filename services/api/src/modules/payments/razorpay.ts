@@ -42,6 +42,7 @@ export class RazorpayProvider {
     return { reference: payment.id, orderId: payment.order_id, amountPaise: payment.amount, currency: payment.currency, captured: true };
   }
   verifyCheckoutSignature(orderId: string, paymentId: string, signature: string) {
+    if (!providerId('order').safeParse(orderId).success || !providerId('pay').safeParse(paymentId).success) return false;
     if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
     const expected = createHmac('sha256', this.config.keySecret).update(`${orderId}|${paymentId}`).digest();
     return timingSafeEqual(expected, Buffer.from(signature, 'hex'));

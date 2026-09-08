@@ -1,5 +1,35 @@
 # Production runbook
 
+## P7-A provider changes
+
+Read [provider configuration](provider-configuration.md) and the
+[P7-A evidence and blockers](p7-a-provider-closure.md) before enabling any
+provider. Apply the additive `20260909070000_provider_push` migration with the
+migration identity; grant the runtime role the required PushDevice operations.
+Rotate the dedicated notification encryption key only with a device-token
+reencryption or re-registration procedure. Never discard it while encrypted
+registrations remain active.
+
+Database connections now explicitly use UTC. The local PostgreSQL timezone was
+interpreting Prisma date parameters as local wall time, disagreeing with SQL
+`now()` by 5h30m. Fresh records are tested against worker eligibility. Existing
+records written under a non-UTC session need a separate evidence-based timestamp
+audit; do not blindly shift existing customer or financial history. Local demo
+sessions may require a fresh sign-in after the correction.
+
+The Doctor Portal web app has been removed from the repository and CI. Remove
+retired portal origins from deployment configuration. Backend doctor session,
+role and ownership controls remain; there is no doctor web artifact to deploy.
+
+Push jobs reuse the PostgreSQL worker. Keep `PUSH_PROVIDER=disabled` until Firebase
+configuration, consent, client registration, device delivery and invalid-token
+acceptance are complete. UNKNOWN deliveries require investigation; never reset
+them to PENDING without determining whether the provider accepted the message.
+Keep email worker routing disabled until verified recipients and consent exist.
+Never switch Razorpay to live fulfilment: checkout/settlement wiring remains
+unfinished. No automatic recurring debits, WhatsApp assistant delivery, video
+rooms or production media are activated by this change.
+
 This is an operator procedure, not a record of deployment. No production service,
 DNS, real payment, real message or public release was activated in Phase 7.
 Start with [configuration](production-config.md), [validation](phase-7-validation.md)

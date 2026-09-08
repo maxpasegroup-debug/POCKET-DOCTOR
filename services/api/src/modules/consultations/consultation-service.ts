@@ -4,6 +4,7 @@ import { memberPrice } from '../membership/entitlements.js';
 import { ApiError } from '../../errors/api-error.js';
 import { DevelopmentPaymentProvider, receiptMatches } from '../programs/payment-provider.js';
 import { generateSlots, type AvailabilityInput } from './availability.js';
+import { UnavailableConsultationProvider, type ConsultationSessionProvider } from './session-provider.js';
 
 type Tx = Prisma.TransactionClient;
 const missing = () => new ApiError(404, 'NOT_FOUND', 'This consultation or doctor is not available.');
@@ -23,7 +24,19 @@ export function doctorDto(doctor: Doctor) {
 export class ConsultationService {
   // Aggregate counters only: no actor IDs, specialty, query text or record content.
   readonly events = new Map<string, number>();
-  constructor(private db: PrismaClient, private env: Environment) {}
+  constructor(private db: PrismaClient, private env: Environment,
+    private sessions: ConsultationSessionProvider = new UnavailableConsultationProvider()) {}
+  async sessionAccess(userId: string, id: string, role: 'patient' | 'doctor') {
+    const doctor = role === 'doctor' ? await this.assignedDoctor(userId) : null;
+    const appointment = await this.db.consultation.findFirst({ where: { id, ...(doctor ? { doctorId: doctor.id } : { userId }) }, include: { payments: true } });
+    if (!appointment) throw missing();
+    const now = new Date();
+    if (!['CONFIRMED', 'IN_PROGRESS'].includes(appointment.status) || now < appointment.startsAt || now >= appointment.endsAt
+      || (appointment.feePaise > 0 && !appointment.payments.some(payment => payment.status === 'VERIFIED' && payment.refundStatus !== 'REFUNDED')))
+      throw new ApiError(409, 'SESSION_UNAVAILABLE', 'This appointment is not available to join now.');
+    return this.sessions.createAccess({ consultationId: appointment.id, participantId: userId, role,
+      expiresAt: new Date(Math.min(appointment.endsAt.getTime(), Date.now() + 300000)) });
+  }
   private event(name: 'doctor_profile_viewed' | 'doctor_search' | 'slot_viewed' | 'booking_started' | 'booking_completed' | 'booking_cancelled') {
     this.events.set(name, (this.events.get(name) ?? 0) + 1);
   }

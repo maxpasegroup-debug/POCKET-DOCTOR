@@ -110,7 +110,7 @@ class ProgramCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final placeholder = Container(
       width: double.infinity,
-      color: AppColors.mint,
+      color: AppColors.navy,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,12 +118,14 @@ class ProgramCover extends StatelessWidget {
           Icon(
             program.isLive ? Icons.groups_outlined : Icons.menu_book_outlined,
             size: 40,
-            color: AppColors.green,
+            color: const Color(0xFF8DE9BA),
           ),
           const SizedBox(height: 12),
           Text(
             program.isDemo ? 'DEMO · LEARN & TRANSFORM' : 'LEARN & TRANSFORM',
-            style: Theme.of(context).textTheme.labelLarge,
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: Colors.white),
           ),
         ],
       ),

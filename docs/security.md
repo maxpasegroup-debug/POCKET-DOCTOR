@@ -64,7 +64,7 @@ notes are excluded from patient responses; only completed shared summaries appea
 Doctor writes recheck verification under the scheduling lock. Booking overlap is
 also rejected by a database exclusion constraint, independent of UI checks. The
 shared payment ledger accepts one purchase target and server-controlled receipts.
-The doctor portal keeps browser tokens in memory and discards stale session responses.
+Doctor authorization remains enforced by the API after removal of the web portal.
 Demo doctors/payments cannot be enabled in deployed environments. See
 [Phase 3 privacy and provider boundaries](phase-3.md#records-privacy-and-access).
 

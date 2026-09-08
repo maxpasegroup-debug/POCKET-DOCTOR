@@ -93,14 +93,11 @@ jobs:
         run: |
           if [ -n "${PD_API_PID:-}" ]; then kill "$PD_API_PID" || true; fi
           docker rm --force pocket-doctor-ci || true
-  portals:
+  admin-console:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        portal: [doctor-portal, admin-console]
     defaults:
       run:
-        working-directory: apps/${{ matrix.portal }}
+        working-directory: apps/admin-console
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

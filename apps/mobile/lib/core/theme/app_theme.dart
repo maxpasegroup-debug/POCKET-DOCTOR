@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const navy = Color(0xFF142E40);
-  static const green = Color(0xFF17634B);
-  static const canvas = Color(0xFFF7F9F7);
-  static const mint = Color(0xFFE8F2EB);
-  static const muted = Color(0xFF53666E);
-  static const border = Color(0xFFD9E2DD);
-  static const lavender = Color(0xFFEEEAF6);
-  static const violet = Color(0xFF635080);
-  static const information = Color(0xFF245A7B);
+  static const navy = Color(0xFF061D43);
+  static const green = Color(0xFF007D38);
+  static const canvas = Color(0xFFFCFDFF);
+  static const mint = Color(0xFFE5F7EF);
+  static const muted = Color(0xFF4B6080);
+  static const border = Color(0xFFE4EAF2);
+  static const lavender = Color(0xFFF0EAFE);
+  static const violet = Color(0xFF6543C4);
+  static const information = Color(0xFF245BC1);
+  static const sky = Color(0xFFE8F3FF);
   static const warning = Color(0xFF825600);
   static const error = Color(0xFFAE303B);
 }
@@ -75,8 +76,38 @@ abstract final class AppTheme {
       scrolledUnderElevation: 0,
     ),
     dividerTheme: const DividerThemeData(color: AppColors.border, space: 1),
+    cardTheme: const CardThemeData(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: const Color(0xFFF3F6FA),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.green, width: 2),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0xFFF3F6FA),
+      selectedColor: AppColors.mint,
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      labelStyle: const TextStyle(color: AppColors.navy, fontSize: 13),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
+        backgroundColor: AppColors.navy,
+        foregroundColor: Colors.white,
         minimumSize: const Size(48, 52),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -92,7 +123,14 @@ abstract final class AppTheme {
       backgroundColor: Colors.white,
       indicatorColor: AppColors.mint,
       elevation: 0,
-      height: 76,
+      height: 68,
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppColors.navy,
+        ),
+      ),
     ),
     navigationRailTheme: const NavigationRailThemeData(
       backgroundColor: Colors.white,

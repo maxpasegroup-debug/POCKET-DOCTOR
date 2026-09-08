@@ -22,6 +22,8 @@ export function registerPaymentWebhook(app: FastifyInstance, env: Environment, d
       if (!eventId.success || !parsed.success) throw new ApiError(400, 'INVALID_REQUEST', 'Unsupported payment event.');
       const kind = parsed.data.event.split('.')[0]!; const reference = parsed.data.payload[kind]?.entity.id;
       if (!reference) throw new ApiError(400, 'INVALID_REQUEST', 'Payment event reference is missing.');
+      const prefix = kind === 'payment' ? 'pay' : kind === 'refund' ? 'rfnd' : 'sub';
+      if (!new RegExp(`^${prefix}_[A-Za-z0-9]{1,80}$`).test(reference)) throw new ApiError(400, 'INVALID_REQUEST', 'Invalid provider resource.');
       await db.$transaction(async tx => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${eventId.data}, 7708))::text`;
         const previous = await tx.providerEvent.findUnique({ where: { provider_eventId: { provider: 'razorpay', eventId: eventId.data } } });

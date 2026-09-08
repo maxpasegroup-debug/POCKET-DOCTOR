@@ -36,8 +36,16 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const BrandLockup(),
-        toolbarHeight: 72,
+        toolbarHeight: largeText ? 100 : 56,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => context.push('/notifications'),
+            icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         top: false,
