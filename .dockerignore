@@ -1,0 +1,16 @@
+# Root context is only for ops/Dockerfile.web; never upload workspace data/secrets.
+**
+!ops/
+!ops/Dockerfile.web
+!ops/serve-web.mjs
+!apps/
+!apps/admin-console/
+!apps/admin-console/dist/
+!apps/admin-console/dist/**
+!apps/doctor-portal/
+!apps/doctor-portal/dist/
+!apps/doctor-portal/dist/**
+!apps/mobile/
+!apps/mobile/build/
+!apps/mobile/build/web/
+!apps/mobile/build/web/**

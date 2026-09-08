@@ -1,0 +1,16 @@
+{
+  "name": "@pocket-doctor/doctor-portal",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

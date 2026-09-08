@@ -1,0 +1,12 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+# Build the selected frontend first, then pass its directory as BUILD_DIRECTORY.
+ARG BUILD_DIRECTORY=apps/admin-console/dist
+COPY ${BUILD_DIRECTORY}/ /app/public/
+COPY ops/serve-web.mjs /app/serve-web.mjs
+ENV STATIC_ROOT=/app/public
+ENV HOST=0.0.0.0
+ENV NODE_ENV=production
+USER node
+EXPOSE 8080
+CMD ["node", "serve-web.mjs"]

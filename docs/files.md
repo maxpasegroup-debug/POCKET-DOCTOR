@@ -1,0 +1,142 @@
+# Phase 0 source file inventory (historical)
+
+For subsequent additions and edits, see phase-1-files.md. The workspace was empty
+before Phase 0. Every source file below was created for
+this phase; no pre-existing project files were modified. Flutter-generated
+scaffolding was then adapted for the Pocket Doctor foundation.
+
+Generated clients, dependency caches, local SDK paths, build outputs, temporary
+PostgreSQL tooling and screenshots are excluded by the repository ignore files.
+`docs/files.md` is this inventory itself.
+
+## Files created
+
+- `.env.example`
+- `.github/workflows/ci.yml`
+- `.gitignore`
+- `apps/admin-console/README.md`
+- `apps/doctor-portal/README.md`
+- `apps/mobile/.gitignore`
+- `apps/mobile/.metadata`
+- `apps/mobile/analysis_options.yaml`
+- `apps/mobile/android/.gitignore`
+- `apps/mobile/android/app/build.gradle.kts`
+- `apps/mobile/android/app/src/debug/AndroidManifest.xml`
+- `apps/mobile/android/app/src/main/AndroidManifest.xml`
+- `apps/mobile/android/app/src/main/kotlin/com/pocketdoctor/pocket_doctor/MainActivity.kt`
+- `apps/mobile/android/app/src/main/res/drawable/launch_background.xml`
+- `apps/mobile/android/app/src/main/res/drawable-v21/launch_background.xml`
+- `apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher.png`
+- `apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher.png`
+- `apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png`
+- `apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png`
+- `apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png`
+- `apps/mobile/android/app/src/main/res/values/styles.xml`
+- `apps/mobile/android/app/src/main/res/values-night/styles.xml`
+- `apps/mobile/android/app/src/profile/AndroidManifest.xml`
+- `apps/mobile/android/build.gradle.kts`
+- `apps/mobile/android/gradle.properties`
+- `apps/mobile/android/gradle/wrapper/gradle-wrapper.properties`
+- `apps/mobile/android/settings.gradle.kts`
+- `apps/mobile/assets/brand/README.md`
+- `apps/mobile/ios/.gitignore`
+- `apps/mobile/ios/Flutter/AppFrameworkInfo.plist`
+- `apps/mobile/ios/Flutter/Debug.xcconfig`
+- `apps/mobile/ios/Flutter/Release.xcconfig`
+- `apps/mobile/ios/Runner.xcodeproj/project.pbxproj`
+- `apps/mobile/ios/Runner.xcodeproj/project.xcworkspace/contents.xcworkspacedata`
+- `apps/mobile/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist`
+- `apps/mobile/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings`
+- `apps/mobile/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`
+- `apps/mobile/ios/Runner.xcworkspace/contents.xcworkspacedata`
+- `apps/mobile/ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist`
+- `apps/mobile/ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings`
+- `apps/mobile/ios/Runner/AppDelegate.swift`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/Contents.json`
+- `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png`
+- `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md`
+- `apps/mobile/ios/Runner/Base.lproj/LaunchScreen.storyboard`
+- `apps/mobile/ios/Runner/Base.lproj/Main.storyboard`
+- `apps/mobile/ios/Runner/Info.plist`
+- `apps/mobile/ios/Runner/Runner-Bridging-Header.h`
+- `apps/mobile/ios/Runner/SceneDelegate.swift`
+- `apps/mobile/ios/RunnerTests/RunnerTests.swift`
+- `apps/mobile/lib/app.dart`
+- `apps/mobile/lib/core/config/app_config.dart`
+- `apps/mobile/lib/core/networking/health_repository.dart`
+- `apps/mobile/lib/core/routing/app_router.dart`
+- `apps/mobile/lib/core/routing/app_routes.dart`
+- `apps/mobile/lib/core/storage/README.md`
+- `apps/mobile/lib/core/theme/app_theme.dart`
+- `apps/mobile/lib/features/assistant/presentation/assistant_screen.dart`
+- `apps/mobile/lib/features/auth/domain/session_repository.dart`
+- `apps/mobile/lib/features/auth/presentation/splash_screen.dart`
+- `apps/mobile/lib/features/auth/presentation/welcome_screen.dart`
+- `apps/mobile/lib/features/consultation/presentation/consultation_screen.dart`
+- `apps/mobile/lib/features/health/README.md`
+- `apps/mobile/lib/features/home/presentation/home_screen.dart`
+- `apps/mobile/lib/features/profile/presentation/profile_screen.dart`
+- `apps/mobile/lib/features/programs/presentation/programs_screen.dart`
+- `apps/mobile/lib/main.dart`
+- `apps/mobile/lib/shared/widgets/app_shell.dart`
+- `apps/mobile/lib/shared/widgets/brand_lockup.dart`
+- `apps/mobile/lib/shared/widgets/foundation_widgets.dart`
+- `apps/mobile/pubspec.lock`
+- `apps/mobile/pubspec.yaml`
+- `apps/mobile/README.md`
+- `apps/mobile/test/smoke/backend_health_test.dart`
+- `apps/mobile/test/unit/app_config_test.dart`
+- `apps/mobile/test/unit/health_repository_test.dart`
+- `apps/mobile/test/widgets/navigation_test.dart`
+- `apps/mobile/web/favicon.png`
+- `apps/mobile/web/icons/Icon-192.png`
+- `apps/mobile/web/icons/Icon-512.png`
+- `apps/mobile/web/icons/Icon-maskable-192.png`
+- `apps/mobile/web/icons/Icon-maskable-512.png`
+- `apps/mobile/web/index.html`
+- `apps/mobile/web/manifest.json`
+- `docs/api.md`
+- `docs/architecture.md`
+- `docs/design-system.md`
+- `docs/security.md`
+- `docs/validation.md`
+- `README.md`
+- `services/api/.dockerignore`
+- `services/api/Dockerfile`
+- `services/api/package.json`
+- `services/api/package-lock.json`
+- `services/api/prisma.config.ts`
+- `services/api/prisma/migrations/20260905000000_identity_foundation/migration.sql`
+- `services/api/prisma/migrations/migration_lock.toml`
+- `services/api/prisma/schema.prisma`
+- `services/api/railway.json`
+- `services/api/scripts/check-database.ts`
+- `services/api/src/app.ts`
+- `services/api/src/config/env.ts`
+- `services/api/src/database/database.ts`
+- `services/api/src/errors/api-error.ts`
+- `services/api/src/modules/auth/authorization.ts`
+- `services/api/src/modules/auth/contracts.ts`
+- `services/api/src/server.ts`
+- `services/api/test/database.integration.test.ts`
+- `services/api/test/foundation.test.ts`
+- `services/api/tsconfig.build.json`
+- `services/api/tsconfig.json`

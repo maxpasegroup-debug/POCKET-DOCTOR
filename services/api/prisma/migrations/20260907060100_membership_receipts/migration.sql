@@ -1,0 +1,4 @@
+ALTER TABLE "Invoice" DROP CONSTRAINT "Invoice_paymentId_fkey";
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "EnrollmentPayment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "EnrollmentPayment" ADD COLUMN "refundStatus" VARCHAR(30) NOT NULL DEFAULT 'NOT_REQUESTED';
+ALTER TABLE "EnrollmentPayment" ADD CONSTRAINT "payment_refund_state" CHECK ("refundStatus" IN ('NOT_REQUESTED','REFUND_REQUESTED','REFUND_PROCESSING','REFUNDED','REFUND_FAILED'));

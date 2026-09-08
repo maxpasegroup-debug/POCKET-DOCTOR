@@ -1,0 +1,117 @@
+name: Pocket Doctor validation
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+          cache: true
+      - name: Start disposable database with generated credentials
+        shell: bash
+        run: |
+          pd_ci_password=$(openssl rand -hex 24)
+          pd_ci_session=$(openssl rand -hex 32)
+          echo "::add-mask::$pd_ci_password"
+          echo "::add-mask::$pd_ci_session"
+          export POSTGRES_PASSWORD="$pd_ci_password"
+          docker run --detach --name pocket-doctor-ci --publish 127.0.0.1:5432:5432 --env POSTGRES_PASSWORD --env POSTGRES_USER=foundation --env POSTGRES_DB=pocket_doctor_test postgres:18.6
+          echo "DATABASE_URL=postgresql://foundation:$pd_ci_password@127.0.0.1:5432/pocket_doctor_test" >> "$GITHUB_ENV"
+          echo "SESSION_SECRET=$pd_ci_session" >> "$GITHUB_ENV"
+          for i in {1..30}; do
+            if docker exec pocket-doctor-ci pg_isready -U foundation -d pocket_doctor_test; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Backend validation
+        working-directory: services/api
+        env:
+          APP_ENV: test
+          AUTH_INTEGRATION: 'true'
+        run: |
+          npm ci
+          npm run build
+          npm run typecheck
+          npm run db:validate
+          npm run db:deploy
+          npm run db:check
+          npm test
+          npm audit --audit-level=high
+      - name: Source credential check
+        run: node ops/scan-secrets.mjs
+      - name: Web serving security test
+        run: node --test ops/test/*.test.mjs
+      - name: Start isolated demo API for all mobile journeys
+        working-directory: services/api
+        env:
+          APP_ENV: development
+          OTP_MODE: development
+          ADMIN_SECURITY_MODE: development
+          DEMO_PROGRAMS: 'true'
+          DEMO_CONSULTATIONS: 'true'
+          DEMO_WELLNESS: 'true'
+          PAYMENT_MODE: development
+          AI_PROVIDER: development
+        run: |
+          npm run programs:seed
+          npm run consultations:seed
+          npm run wellness:seed
+          npm run membership:seed
+          node dist/server.js > /tmp/pocket-doctor-api.log 2>&1 &
+          echo "PD_API_PID=$!" >> "$GITHUB_ENV"
+          for i in {1..20}; do
+            if curl --fail --silent http://localhost:3000/api/v1/health/ready; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Flutter validation
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test --concurrency=1 --dart-define=RUN_API_SMOKE=true --dart-define=RUN_AUTH_SMOKE=true --dart-define=RUN_PROGRAM_SMOKE=true --dart-define=RUN_CONSULTATION_SMOKE=true --dart-define=RUN_COMMERCE_SMOKE=true --dart-define=RUN_ASSISTANT_SMOKE=true --dart-define=RUN_MEMBERSHIP_SMOKE=true
+          flutter build apk --debug
+          flutter build web --release --no-web-resources-cdn --dart-define-from-file=config/production.example.json
+      - name: Stop isolated resources
+        if: always()
+        run: |
+          if [ -n "${PD_API_PID:-}" ]; then kill "$PD_API_PID" || true; fi
+          docker rm --force pocket-doctor-ci || true
+  portals:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        portal: [doctor-portal, admin-console]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.portal }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: https://api.example.invalid/api/v1
+          VITE_SHOW_DEVELOPMENT_OTP: 'false'
+# HTTPS example origins validate compilation only. No deployment or live-provider
+# readiness is inferred from these builds. Store signing is a separate private job.

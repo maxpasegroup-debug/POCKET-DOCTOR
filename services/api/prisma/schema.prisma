@@ -1,0 +1,840 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RequestBudget {
+  key String @id @db.VarChar(64)
+  count Int
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+
+// Append-only operations evidence; no bodies, notes, credentials or patient facts.
+model AdminAuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String? @db.Uuid
+  action String @db.VarChar(160)
+  resourceId String? @db.VarChar(80)
+  requestId String @db.VarChar(80)
+  result String @db.VarChar(30)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([createdAt, id])
+  @@index([actorId, createdAt])
+}
+model AdminElevation {
+  sessionId String @id @db.Uuid
+  userId String @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+model AdminMfaCounter {
+  userId String @id @db.Uuid
+  counter BigInt
+  failedAttempts Int @default(0)
+  windowStartedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model ConsentRecord {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  type String @db.VarChar(40)
+  version String @db.VarChar(40)
+  granted Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, type, createdAt])
+}
+model PrivacyRequest {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type String @db.VarChar(30)
+  status String @default("PENDING_REVIEW") @db.VarChar(30)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, createdAt])
+}
+// Single inbox/outbox references existing domain events without copying health data.
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceKey String @unique @db.VarChar(160)
+  kind String @db.VarChar(50)
+  route String @db.VarChar(180)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  readAt DateTime? @db.Timestamptz(3)
+  channel String @default("IN_APP") @db.VarChar(20)
+  status String @default("AVAILABLE") @db.VarChar(30)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @db.Timestamptz(3)
+  providerReference String? @unique @db.VarChar(160)
+  lastError String? @db.VarChar(40)
+  @@index([userId, createdAt, id])
+  @@index([status, nextAttemptAt])
+}
+// Verified provider receipts only. Never persist raw webhook bodies or credentials.
+model ProviderEvent {
+  id String @id @default(uuid()) @db.Uuid
+  provider String @db.VarChar(30)
+  eventId String @db.VarChar(160)
+  kind String @db.VarChar(60)
+  reference String @db.VarChar(160)
+  status String @default("RECEIVED") @db.VarChar(30)
+  requestId String @db.VarChar(80)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([provider, eventId])
+  @@index([status, createdAt])
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELLED
+  EXPIRED
+  PAYMENT_FAILED
+}
+enum RevenueSource {
+  MEMBERSHIP
+  PROGRAM
+  CONSULTATION
+  WELLNESS
+}
+model MembershipPlan {
+  id String @id @default(uuid()) @db.Uuid
+  slug String @unique @db.VarChar(60)
+  name String @db.VarChar(100)
+  description String @db.VarChar(500)
+  pricePaise Int
+  currency String @default("INR") @db.VarChar(3)
+  interval BillingInterval
+  active Boolean @default(false)
+  isDemo Boolean @default(true)
+  trialDays Int @default(0)
+  graceDays Int @default(0)
+  position Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  benefits MembershipBenefit[]
+  subscriptions Subscription[]
+  coupons CouponPlan[]
+}
+model MembershipBenefit {
+  id String @id @default(uuid()) @db.Uuid
+  planId String @db.Uuid
+  plan MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  key String @db.VarChar(40)
+  label String @db.VarChar(160)
+  resourceIds String[] @db.Uuid
+  value Int @default(0)
+  @@unique([planId, key])
+}
+model Subscription {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  planId String @db.Uuid
+  plan MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status SubscriptionStatus @default(PENDING)
+  // Snapshot agreed price and benefits; editing a plan cannot change a paid term.
+  pricePaise Int
+  currency String @db.VarChar(3)
+  interval BillingInterval
+  benefits Json
+  graceDays Int @default(0)
+  provider String @db.VarChar(30)
+  requestKey String @db.Uuid
+  periodStart DateTime? @db.Timestamptz(3)
+  periodEnd DateTime? @db.Timestamptz(3)
+  graceEnd DateTime? @db.Timestamptz(3)
+  pendingUntil DateTime @db.Timestamptz(3)
+  cancelAtPeriodEnd Boolean @default(false)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  trialUsed Boolean @default(false)
+  isTrial Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  payments EnrollmentPayment[]
+  events SubscriptionEvent[]
+  @@unique([userId, requestKey])
+  @@index([userId, createdAt])
+  @@index([status, periodEnd])
+}
+model SubscriptionEvent {
+  id String @id @default(uuid()) @db.Uuid
+  subscriptionId String @db.Uuid
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  kind String @db.VarChar(50)
+  // Lifecycle events double as a notification outbox; no delivery claimed.
+  notificationPending Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([subscriptionId, createdAt])
+}
+model Coupon {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(40)
+  type String @db.VarChar(10)
+  value Int
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  usageLimit Int
+  perUserLimit Int @default(1)
+  active Boolean @default(false)
+  introductory Boolean @default(false)
+  plans CouponPlan[]
+  redemptions CouponRedemption[]
+}
+model CouponPlan {
+  couponId String @db.Uuid
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  planId String @db.Uuid
+  plan MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  @@id([couponId, planId])
+}
+model CouponRedemption {
+  id String @id @default(uuid()) @db.Uuid
+  couponId String @db.Uuid
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  paymentId String @unique @db.Uuid
+  payment EnrollmentPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  basePaise Int
+  discountPaise Int
+  reservedUntil DateTime @db.Timestamptz(3)
+  redeemedAt DateTime? @db.Timestamptz(3)
+  @@index([couponId, userId])
+}
+model Invoice {
+  id String @id @default(uuid()) @db.Uuid
+  number String @unique
+  paymentId String @unique @db.Uuid
+  payment EnrollmentPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  source RevenueSource
+  amountPaise Int
+  currency String @db.VarChar(3)
+  taxPaise Int?
+  status String @default("RECEIPT")
+  issuedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([source, issuedAt])
+}
+
+enum Role {
+  USER
+  DOCTOR
+  ADMIN
+}
+
+// Basic identity only; no medical history or clinical records.
+model User {
+  accountStatus String @default("ACTIVE") @db.VarChar(20)
+  privacyRequests PrivacyRequest[]
+  notificationInbox Notification[]
+  id        String     @id @default(uuid()) @db.Uuid
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime   @updatedAt @db.Timestamptz(3)
+  roles     UserRole[]
+  phone     String?    @unique @db.VarChar(16)
+  fullName  String?    @db.VarChar(100)
+  language  String     @default("en") @db.VarChar(5)
+  interests String[]   @default([])
+  profileCompletedAt DateTime? @db.Timestamptz(3)
+  notifications Boolean @default(false)
+  sessions Session[]
+  enrollments ProgramEnrollment[]
+  programPayments EnrollmentPayment[]
+  doctorProfile Doctor?
+  consultations Consultation[]
+  cartItems CartItem[]
+  addresses Address[]
+  orders Order[]
+  aiConversations AIConversation[]
+  aiMemory AIMemory[]
+  wellnessGoals WellnessGoal[]
+  wellnessCheckIns WellnessCheckIn[]
+  reminders Reminder[]
+  aiPreferences AIPreferences?
+  whatsappIdentity WhatsAppIdentity?
+  whatsappLinkToken WhatsAppLinkToken?
+  aiAudit AIAuditEvent[]
+  subscriptions Subscription[]
+  couponRedemptions CouponRedemption[]
+}
+
+model AIConversation {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  messages AIMessage[]
+  @@index([userId, updatedAt])
+}
+
+model AIMessage {
+  id String @id @default(uuid()) @db.Uuid
+  conversationId String @db.Uuid
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  requestKey String @db.Uuid
+  prompt String @db.VarChar(2000)
+  response Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([conversationId, requestKey])
+  @@index([conversationId, createdAt])
+}
+
+model AIMemory {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text String @db.VarChar(300)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([userId])
+}
+
+model WellnessGoal {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title String @db.VarChar(120)
+  target String @db.VarChar(120)
+  startDate DateTime @db.Date
+  targetDate DateTime? @db.Date
+  progress Int @default(0)
+  status String @default("ACTIVE") @db.VarChar(20)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, status])
+}
+
+model WellnessCheckIn {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date DateTime @db.Date
+  mood String @db.VarChar(30)
+  energy Int
+  sleepHours Float?
+  waterMl Int?
+  activityMinutes Int?
+  weightKg Float?
+  habitCompleted Boolean @default(false)
+  @@unique([userId, date])
+}
+
+model Reminder {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title String @db.VarChar(120)
+  kind String @db.VarChar(20)
+  dueAt DateTime @db.Timestamptz(3)
+  completed Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, completed, dueAt])
+}
+
+model AIPreferences {
+  userId String @id @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerConsent Boolean @default(false)
+  useMemory Boolean @default(false)
+  appReminders Boolean @default(false)
+  whatsappReminders Boolean @default(false)
+  programReminders Boolean @default(false)
+  consultationReminders Boolean @default(false)
+  wellnessReminders Boolean @default(false)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model WhatsAppIdentity {
+  userId String @id @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  waId String @unique @db.VarChar(20)
+  linkedAt DateTime @default(now()) @db.Timestamptz(3)
+  lastInboundAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model WhatsAppLinkToken {
+  userId String @id @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique @db.VarChar(64)
+  expiresAt DateTime @db.Timestamptz(3)
+  candidateWaId String? @db.VarChar(20)
+}
+
+// No message bodies or provider payloads in audit/receipt records.
+model AIAuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event String @db.VarChar(40)
+  classification String? @db.VarChar(30)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, createdAt])
+}
+
+model WhatsAppReceipt {
+  id String @id @db.VarChar(200)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+// A person can be both a patient and a doctor; roles are server-managed.
+// No role is implicitly assigned or accepted from client input in Phase 0.
+model UserRole {
+  userId String @db.Uuid
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+}
+
+model OtpChallenge {
+  id String @id @db.Uuid
+  phone String @unique @db.VarChar(16)
+  codeHash String @db.VarChar(64)
+  expiresAt DateTime @db.Timestamptz(3)
+  requestedAt DateTime @db.Timestamptz(3)
+  windowStartedAt DateTime @db.Timestamptz(3)
+  requestCount Int @default(1)
+  attempts Int @default(0)
+  consumed Boolean @default(false)
+}
+
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  tokenHash String @unique @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum ProgramType {
+  RECORDED
+  LIVE
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+// Publishing requires a verified professional, or an explicitly marked demo.
+model Doctor {
+  id String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(100)
+  qualification String @db.VarChar(200)
+  specialty String @db.VarChar(100)
+  experienceYears Int?
+  biography String
+  verifiedAt DateTime? @db.Timestamptz(3)
+  isDemo Boolean @default(false)
+  programs Program[]
+  userId String? @unique @db.Uuid
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  verificationStatus DoctorVerification @default(PENDING_VERIFICATION)
+  registrationAuthority String?
+  registrationNumber String?
+  photoUrl String?
+  languages String[] @default([])
+  feePaise Int @default(0)
+  consultationMinutes Int @default(30)
+  bufferMinutes Int @default(0)
+  timezone String @default("Asia/Kolkata")
+  acceptingAppointments Boolean @default(false)
+  featured Boolean @default(false)
+  availability DoctorAvailability[]
+  exceptions DoctorAvailabilityException[]
+  consultations Consultation[]
+  @@index([verificationStatus, acceptingAppointments])
+  wellnessProducts WellnessProduct[]
+}
+
+model ProgramCategory {
+  id String @id @db.VarChar(60)
+  name String @unique @db.VarChar(100)
+  interest String? @db.VarChar(100)
+  position Int @default(0)
+  programs Program[]
+}
+
+model Program {
+  archivedAt DateTime? @db.Timestamptz(3)
+  membershipOnly Boolean @default(false)
+  id String @id @default(uuid()) @db.Uuid
+  title String @db.VarChar(200)
+  description String
+  audience String
+  outcomes String[]
+  coverUrl String?
+  type ProgramType
+  level String @default("Beginner") @db.VarChar(40)
+  durationMinutes Int
+  pricePaise Int @default(0)
+  currency String @default("INR") @db.VarChar(3)
+  featured Boolean @default(false)
+  published Boolean @default(false)
+  isDemo Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  doctorId String @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  categoryId String @db.VarChar(60)
+  category ProgramCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  modules ProgramModule[]
+  liveSessions LiveSession[]
+  enrollments ProgramEnrollment[]
+  payments EnrollmentPayment[]
+  @@index([published, categoryId, type])
+}
+
+model ProgramModule {
+  id String @id @default(uuid()) @db.Uuid
+  programId String @db.Uuid
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title String @db.VarChar(200)
+  position Int
+  lessons Lesson[]
+  @@unique([programId, position])
+}
+
+model Lesson {
+  id String @id @default(uuid()) @db.Uuid
+  moduleId String @db.Uuid
+  module ProgramModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title String @db.VarChar(200)
+  description String
+  position Int
+  durationSeconds Int
+  required Boolean @default(true)
+  // Opaque hosting reference, never included in discovery/detail DTOs.
+  mediaRef String?
+  keyPoints String[]
+  supportingMaterial String
+  progress LessonProgress[]
+  @@unique([moduleId, position])
+}
+
+model ProgramEnrollment {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId String @db.Uuid
+  program Program @relation(fields: [programId], references: [id], onDelete: Restrict)
+  status EnrollmentStatus @default(ENROLLED)
+  enrolledAt DateTime @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  progress LessonProgress[]
+  @@unique([userId, programId])
+  @@index([userId, status])
+}
+
+model LessonProgress {
+  enrollmentId String @db.Uuid
+  enrollment ProgramEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId String @db.Uuid
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  positionSeconds Int @default(0)
+  startedAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  @@id([enrollmentId, lessonId])
+}
+
+model LiveSession {
+  id String @id @default(uuid()) @db.Uuid
+  programId String @db.Uuid
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title String @db.VarChar(200)
+  startsAt DateTime @db.Timestamptz(3)
+  durationMinutes Int
+  information String
+  // Provider reference reserved; join credentials must be resolved after access checks.
+  providerRef String?
+  @@index([programId, startsAt])
+}
+
+model EnrollmentPayment {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // Shared payment ledger: exactly one purchase target, enforced by SQL CHECK.
+  programId String? @db.Uuid
+  program Program? @relation(fields: [programId], references: [id], onDelete: Restrict)
+  consultationId String? @db.Uuid
+  consultation Consultation? @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  orderId String? @db.Uuid
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  subscriptionId String? @db.Uuid
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  invoice Invoice?
+  redemption CouponRedemption?
+  amountPaise Int
+  currency String @db.VarChar(3)
+  provider String @db.VarChar(30)
+  status PaymentStatus @default(PENDING)
+  refundStatus String @default("NOT_REQUESTED") @db.VarChar(30)
+  requestKey String? @db.Uuid
+  providerReference String? @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  verifiedAt DateTime? @db.Timestamptz(3)
+  @@index([userId, programId, status])
+  @@index([consultationId, status])
+  @@index([orderId, status])
+  @@index([subscriptionId, status])
+  @@unique([userId, requestKey])
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  OUT_OF_STOCK
+  INACTIVE
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_FAILED
+  EXPIRED
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model WellnessCategory {
+  id String @id @db.VarChar(60)
+  name String @unique @db.VarChar(100)
+  position Int @default(0)
+  products WellnessProduct[]
+}
+
+model WellnessProduct {
+  membershipOnly Boolean @default(false)
+  id String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(160)
+  slug String @unique @db.VarChar(180)
+  sku String @unique @db.VarChar(80)
+  shortDescription String @db.VarChar(400)
+  description String
+  categoryId String @db.VarChar(60)
+  category WellnessCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images String[] @default([])
+  pricePaise Int
+  mrpPaise Int?
+  status ProductStatus @default(DRAFT)
+  brand String @db.VarChar(100)
+  manufacturer String
+  ingredients String
+  usage String
+  warnings String
+  storage String
+  quantityLabel String @db.VarChar(100)
+  shippingEligible Boolean @default(false)
+  requiresEligibility Boolean @default(true)
+  contentApproved Boolean @default(false)
+  returnPolicy String
+  featured Boolean @default(false)
+  collection String @default("") @db.VarChar(100)
+  isDemo Boolean @default(false)
+  doctorId String? @db.Uuid
+  doctor Doctor? @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  stockQuantity Int @default(0)
+  reservedQuantity Int @default(0)
+  soldQuantity Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  cartItems CartItem[]
+  orderItems OrderItem[]
+  @@index([status, categoryId])
+}
+
+model CartItem {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String @db.Uuid
+  product WellnessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity Int
+  // Comparison only: never used as the authoritative price.
+  observedPricePaise Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@unique([userId, productId])
+}
+
+model Address {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName String @db.VarChar(100)
+  phone String @db.VarChar(16)
+  line1 String @db.VarChar(200)
+  line2 String @default("") @db.VarChar(200)
+  city String @db.VarChar(100)
+  state String @db.VarChar(100)
+  pinCode String @db.VarChar(6)
+  country String @default("IN") @db.VarChar(2)
+  isDefault Boolean @default(false)
+  @@index([userId])
+}
+
+model Order {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  idempotencyKey String @db.Uuid
+  requestHash String @db.VarChar(64)
+  status OrderStatus @default(PENDING_PAYMENT)
+  subtotalPaise Int
+  deliveryPaise Int
+  discountPaise Int @default(0)
+  totalPaise Int
+  currency String @default("INR") @db.VarChar(3)
+  addressSnapshot Json
+  isDemo Boolean
+  holdExpiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  refundStatus String @default("NOT_REQUIRED") @db.VarChar(30)
+  carrier String?
+  trackingNumber String?
+  items OrderItem[]
+  payments EnrollmentPayment[]
+  events OrderEvent[]
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([status, holdExpiresAt])
+}
+
+model OrderItem {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  productId String @db.Uuid
+  product WellnessProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name String
+  sku String
+  unitPricePaise Int
+  quantity Int
+  returnPolicy String
+  @@unique([orderId, productId])
+}
+
+model OrderEvent {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  status OrderStatus
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([orderId, createdAt])
+}
+
+enum DoctorVerification {
+  PENDING_VERIFICATION
+  VERIFIED
+  SUSPENDED
+  INACTIVE
+  REJECTED
+}
+
+enum ConsultationStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+}
+
+model DoctorAvailability {
+  id String @id @default(uuid()) @db.Uuid
+  doctorId String @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  // ISO weekday 1=Monday, 7=Sunday. Disjoint windows represent breaks.
+  weekday Int
+  startMinute Int
+  endMinute Int
+  @@unique([doctorId, weekday, startMinute])
+}
+
+model DoctorAvailabilityException {
+  id String @id @default(uuid()) @db.Uuid
+  doctorId String @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  localDate String @db.VarChar(10)
+  @@unique([doctorId, localDate])
+}
+
+model Consultation {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  doctorId String @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  reservedUntil DateTime @db.Timestamptz(3)
+  timezone String
+  // Provider-ready reservation; no video/audio/chat capability is claimed.
+  mode String @default("PROVIDER_READY")
+  status ConsultationStatus @default(PENDING_PAYMENT)
+  feePaise Int
+  currency String @default("INR") @db.VarChar(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  holdExpiresAt DateTime @db.Timestamptz(3)
+  cancelledAt DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  refundStatus String @default("NOT_REQUIRED")
+  rescheduledAt DateTime? @db.Timestamptz(3)
+  payments EnrollmentPayment[]
+  note ConsultationNote?
+  reminders ConsultationReminder[]
+  @@index([doctorId, startsAt, status])
+  @@index([userId, startsAt])
+  @@index([status, holdExpiresAt])
+}
+
+model ConsultationNote {
+  consultationId String @id @db.Uuid
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  privateNote String
+  summary String
+  followUpRequired Boolean @default(false)
+  followUpDate String? @db.VarChar(10)
+  followUpNote String
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model ConsultationReminder {
+  id String @id @default(uuid()) @db.Uuid
+  consultationId String @db.Uuid
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  minutesBefore Int
+  dueAt DateTime @db.Timestamptz(3)
+  // An outbox only; no notification delivery claimed.
+  status String @default("PENDING")
+  @@unique([consultationId, minutesBefore])
+  @@index([status, dueAt])
+}

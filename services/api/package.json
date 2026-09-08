@@ -1,0 +1,52 @@
+{
+  "name": "@pocket-doctor/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "generate": "prisma generate",
+    "build": "npm run generate && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/server.js",
+    "test": "tsx --test test/*.test.ts",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:check": "tsx scripts/check-database.ts",
+    "auth:cleanup": "tsx scripts/cleanup-auth.ts",
+    "programs:seed": "tsx scripts/seed-programs.ts",
+    "consultations:seed": "tsx scripts/seed-consultations.ts",
+    "wellness:seed": "tsx scripts/seed-wellness.ts",
+    "commerce:cleanup": "tsx scripts/cleanup-commerce.ts",
+    "assistant:cleanup": "tsx scripts/cleanup-assistant.ts",
+    "membership:seed": "tsx scripts/seed-membership.ts",
+    "membership:cleanup": "tsx scripts/cleanup-membership.ts",
+    "worker": "tsx src/worker.ts",
+    "worker:once": "tsx src/worker.ts --once",
+    "db:backup": "tsx scripts/backup-database.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^17.0.0",
+    "fastify": "^5.0.0",
+    "pg": "^8.0.0",
+    "zod": "^4.0.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.0.0",
+    "prisma": "^7.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0"
+  }
+}

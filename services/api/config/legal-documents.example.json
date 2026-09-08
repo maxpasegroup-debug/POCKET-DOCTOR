@@ -1,0 +1,11 @@
+[
+  { "type": "TERMS", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/terms", "approved": false },
+  { "type": "PRIVACY", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/privacy", "approved": false },
+  { "type": "MEDICAL_DISCLAIMER", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/medical-disclaimer", "approved": false },
+  { "type": "AI_DISCLAIMER", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/ai-disclaimer", "approved": false },
+  { "type": "CONSULTATION_TERMS", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/consultations", "approved": false },
+  { "type": "CANCELLATION_POLICY", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/cancellations", "approved": false },
+  { "type": "REFUND_POLICY", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/refunds", "approved": false },
+  { "type": "WELLNESS_PRODUCT_POLICY", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/wellness-products", "approved": false },
+  { "type": "MEMBERSHIP_TERMS", "version": "draft", "url": "https://pocketdoctor.example.invalid/legal/membership", "approved": false }
+]
