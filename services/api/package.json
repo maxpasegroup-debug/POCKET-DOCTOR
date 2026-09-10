@@ -10,7 +10,7 @@
     "build": "npm run generate && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 test/*.test.ts",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

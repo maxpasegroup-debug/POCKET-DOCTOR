@@ -274,6 +274,15 @@ export DATABASE_URL for an **isolated test database**, apply migrations, and set
 `AUTH_INTEGRATION=true`. The tests create and remove their own synthetic accounts.
 Do not point these tests at production.
 
+`npm test` runs backend test files sequentially (`--test-concurrency=1`). These
+suites share a database and exercise global notification collection and lifecycle
+cleanup; parallel files can race another suite's fixture teardown and deadlock.
+Concurrency scenarios inside tests (simultaneous bookings, subscription requests
+and duplicate payment callbacks) remain concurrent and retain all assertions.
+CI uses this same command. Do not run a separate worker or another test invocation
+against that test database at the same time. Parallel files would require separate
+databases or schemas per suite first.
+
 Flutter, from `apps/mobile`:
 
 ```text
