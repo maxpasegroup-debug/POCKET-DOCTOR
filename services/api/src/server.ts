@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { configuredRegistration } from './modules/doctor-registration/local-store.js';
 import { buildApp } from './app.js';
 import { readEnvironment } from './config/env.js';
 import { createDatabase } from './database/database.js';
@@ -6,7 +7,7 @@ import { createDatabase } from './database/database.js';
 async function main() {
   const env = readEnvironment();
   const database = env.DATABASE_URL ? createDatabase(env.DATABASE_URL) : undefined;
-  const app = await buildApp(env, database);
+  const app = await buildApp(env, database, configuredRegistration(env));
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.once(signal, () => {
       const timeout = setTimeout(() => process.exit(1), 10000).unref();

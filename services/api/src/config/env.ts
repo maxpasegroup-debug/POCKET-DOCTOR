@@ -12,6 +12,12 @@ const schema = z.object({
     z.string().url().refine(value => /^postgres(ql)?:\/\//.test(value)).optional()),
   CORS_ORIGINS: z.string().default(''),
   TRUSTED_PROXY_CIDRS: z.string().default(''),
+  DOCTOR_REGISTRATION_DEFER_DOCUMENTS: z.enum(['true', 'false']).default('false'),
+  DOCTOR_CREDENTIAL_STORAGE: z.enum(['disabled', 'local-test']).default('disabled'),
+  DOCTOR_CREDENTIAL_ROOT: z.string().default(''),
+  DOCTOR_CREDENTIAL_KEY: z.string().default(''),
+  DOCTOR_CREDENTIAL_SCANNER: z.string().default(''),
+  DOCTOR_REQUIRED_CREDENTIALS: z.string().refine(v => v === '' || v.split(',').every(k => ['QUALIFICATION','REGISTRATION','IDENTITY','ADDITIONAL'].includes(k))).default(''),
   OTP_MODE: z.enum(['disabled', 'development', 'provider']).default('disabled'),
   SMS_PROVIDER: z.enum(['disabled', 'twilio']).default('disabled'),
   TWILIO_ACCOUNT_SID: z.string().default(''),
@@ -54,6 +60,8 @@ const schema = z.object({
   WHATSAPP_BUSINESS_ID: z.string().regex(/^\d*$/).default(''),
 }).superRefine((env, ctx) => {
   const deployed = env.APP_ENV === 'staging' || env.APP_ENV === 'production';
+  if (env.DOCTOR_REGISTRATION_DEFER_DOCUMENTS === 'true' && (deployed || env.NODE_ENV === 'production')) ctx.addIssue({code:'custom',path:['DOCTOR_REGISTRATION_DEFER_DOCUMENTS'],message:'Document deferral is development/test only'});
+  if(env.DOCTOR_CREDENTIAL_STORAGE === 'local-test' && (deployed || !env.DOCTOR_CREDENTIAL_ROOT || !env.DOCTOR_CREDENTIAL_SCANNER || !/^[A-Za-z0-9+/]{43}=$/.test(env.DOCTOR_CREDENTIAL_KEY))) ctx.addIssue({code:'custom',path:['DOCTOR_CREDENTIAL_STORAGE'],message:'Local credential storage requires an isolated development/test root, scanner and encryption key'});
   if (env.EMAIL_PROVIDER === 'resend' && (env.RESEND_API_KEY.length < 16 || !z.email().safeParse(env.EMAIL_FROM).success))
     ctx.addIssue({ code: 'custom', path: ['EMAIL_PROVIDER'], message: 'Configure a verified sender and provider key' });
   if (env.PUSH_PROVIDER === 'fcm') {

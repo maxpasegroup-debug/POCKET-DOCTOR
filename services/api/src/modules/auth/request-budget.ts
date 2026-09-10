@@ -6,6 +6,7 @@ import { IdentityService } from './identity-service.js';
 import { ApiError } from '../../errors/api-error.js';
 export function requestBudgetScope(method: string, route: string) {
   if (!['POST', 'PATCH', 'DELETE'].includes(method)) return null;
+  if (/\/doctor\/registration/.test(route)) return { scope: 'doctor-registration', max: 20 };
   if (/\/admin\//.test(route)) return { scope: 'admin', max: 60 };
   if (/\/integrations\/whatsapp\/(link|confirm)$/.test(route)) return { scope: 'whatsapp-link', max: 6 };
   if (/consultations\/(book|[^/]+\/reschedule)$/.test(route)) return { scope: 'booking', max: 20 };

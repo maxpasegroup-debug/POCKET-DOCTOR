@@ -9,6 +9,8 @@ import { TwilioSmsProvider, type SmsOtpProvider } from './sms-provider.js';
 const invalidOtp = () => new ApiError(400, 'INVALID_OTP', 'That code is incorrect or has expired. Please try again or request a new code.');
 const unauthorized = () => new ApiError(401, 'UNAUTHENTICATED', 'Please sign in again.');
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+type OtpPurpose = 'LOGIN' | 'DOCTOR_LOGIN' | 'DOCTOR_REGISTRATION';
+const registrationRequired = () => new ApiError(409, 'DOCTOR_REGISTRATION_REQUIRED', 'No doctor account exists yet. Choose Register as Doctor to apply.');
 
 // Delivery is configurable; all roles reuse this same OTP and session lifecycle.
 export class IdentityService implements SessionVerifier {
@@ -19,7 +21,20 @@ export class IdentityService implements SessionVerifier {
     return createHmac('sha256', this.env.SESSION_SECRET).update(`${id}:${code}`).digest('hex');
   }
 
-  async requestOtp(phone: string) {
+  async requestOtp(phone: string, purpose: OtpPurpose = 'LOGIN') {
+    if (purpose === 'DOCTOR_LOGIN') {
+      const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
+      if (!existing) throw registrationRequired();
+      if (existing.accountStatus !== 'ACTIVE' || !existing.roles.some(r => r.role === 'DOCTOR')) {
+        throw new ApiError(403, 'DOCTOR_LOGIN_NOT_ALLOWED', 'This account cannot sign in to the Doctor app.');
+      }
+    }
+    if (purpose === 'DOCTOR_REGISTRATION') {
+      const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
+      if (existing && !existing.roles.some(r => r.role === 'DOCTOR')) {
+        throw new ApiError(403, 'REGISTRATION_NOT_ALLOWED', 'This account cannot use doctor registration. Contact the platform team.');
+      }
+    }
     if (this.env.OTP_MODE === 'disabled' || (this.env.OTP_MODE === 'development' && !['development', 'test'].includes(this.env.APP_ENV))) {
       throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet. Please try again later.');
     }
@@ -34,7 +49,9 @@ export class IdentityService implements SessionVerifier {
       if (old && (now.getTime() - old.requestedAt.getTime() < 60000 || (sameWindow && old.requestCount >= 5))) {
         throw new ApiError(429, 'OTP_RATE_LIMITED', 'Please wait before requesting another code. You can request up to five codes per hour.');
       }
-      const data = { id, codeHash: this.otpHash(id, code), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
+      // Doctor sign-in is ordinary LOGIN with a stricter account lookup, not a
+      // new authentication purpose or database lifecycle.
+      const data = { id, purpose: purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose, codeHash: this.otpHash(id, code), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
         windowStartedAt: sameWindow ? old.windowStartedAt : now,
         requestCount: sameWindow ? old.requestCount + 1 : 1, attempts: 0, consumed: this.env.OTP_MODE === 'provider' };
       await tx.otpChallenge.upsert({ where: { phone }, create: { phone, ...data }, update: data });
@@ -51,21 +68,37 @@ export class IdentityService implements SessionVerifier {
     return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, developmentCode: code, delivery: 'development' as const };
   }
 
-  async verifyOtp(challengeId: string, code: string, requestId: string = randomUUID()) {
+  async verifyOtp(challengeId: string, code: string, requestId: string = randomUUID(), purpose: OtpPurpose = 'LOGIN') {
     if (this.env.OTP_MODE === 'disabled') throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet.');
     const token = randomBytes(32).toString('base64url');
     const result = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "OtpChallenge" WHERE "id" = ${challengeId}::uuid FOR UPDATE`;
       const challenge = await tx.otpChallenge.findUnique({ where: { id: challengeId } });
-      if (!challenge || challenge.consumed || challenge.attempts >= 5 || challenge.expiresAt <= new Date()) return null;
+      const storedPurpose = purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose;
+      if (!challenge || challenge.purpose !== storedPurpose || challenge.consumed || challenge.attempts >= 5 || challenge.expiresAt <= new Date()) return null;
       if (!timingSafeEqual(Buffer.from(challenge.codeHash, 'hex'), Buffer.from(this.otpHash(challengeId, code), 'hex'))) {
         // Return, don't throw: failed-attempt increments must commit.
         await tx.otpChallenge.update({ where: { id: challengeId }, data: { attempts: { increment: 1 } } });
         return null;
       }
       await tx.otpChallenge.update({ where: { id: challengeId }, data: { consumed: true, codeHash: '0'.repeat(64) } });
-      const user = await tx.user.upsert({ where: { phone: challenge.phone },
-        create: { phone: challenge.phone, roles: { create: { role: 'USER' } } }, update: {}, include: { roles: true } });
+      // Doctor sign-in must never provision a Patient identity. Recheck the role
+      // after OTP verification in case the account changed since the request.
+      const user = purpose === 'DOCTOR_LOGIN'
+        ? await tx.user.findUnique({ where: { phone: challenge.phone }, include: { roles: true } })
+        : await tx.user.upsert({ where: { phone: challenge.phone },
+        create: { phone: challenge.phone, roles: { create: { role: purpose === 'DOCTOR_REGISTRATION' ? 'DOCTOR' : 'USER' } } }, update: {}, include: { roles: true } });
+      if (!user || (purpose === 'DOCTOR_LOGIN' && !user.roles.some(r => r.role === 'DOCTOR'))) return null;
+      // Re-check inside the transaction: ordinary sign-in could have created USER
+      // after a registration challenge was requested. Never promote that account.
+      if (purpose === 'DOCTOR_REGISTRATION' && !user.roles.some(r => r.role === 'DOCTOR')) return null;
+      if (purpose === 'DOCTOR_REGISTRATION' && user.accountStatus === 'ACTIVE') {
+        await tx.doctor.upsert({ where: { userId: user.id }, update: {}, create: {
+          userId: user.id, name: '', qualification: '', specialty: '', biography: '',
+          registrationStartedAt: new Date(), verificationStatus: 'PENDING_VERIFICATION',
+          acceptingAppointments: false, isDemo: false,
+        } });
+      }
       if (user.accountStatus !== 'ACTIVE') return null;
       const privileged = user.roles.some(r => r.role === 'ADMIN' || r.role === 'DOCTOR');
       const expiresAt = new Date(Date.now() + (privileged ? 3600000 : 7 * 24 * 3600000));

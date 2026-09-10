@@ -401,6 +401,7 @@ model UserRole {
 }
 
 model OtpChallenge {
+  purpose String @default("LOGIN") @db.VarChar(24)
   id String @id @db.Uuid
   phone String @unique @db.VarChar(16)
   codeHash String @db.VarChar(64)
@@ -459,6 +460,15 @@ enum PaymentStatus {
 
 // Publishing requires a verified professional, or an explicitly marked demo.
 model Doctor {
+  registrationStartedAt DateTime? @db.Timestamptz(3)
+  registrationSubmittedAt DateTime? @db.Timestamptz(3)
+  registrationReviewStartedAt DateTime? @db.Timestamptz(3)
+  registrationReviewedAt DateTime? @db.Timestamptz(3)
+  registrationRejectionReason String? @db.VarChar(2000)
+  registrationEmail String? @db.VarChar(254)
+  registrationDateOfBirth String? @db.VarChar(10)
+  registrationGender String? @db.VarChar(40)
+  credentials DoctorCredential[]
   id String @id @default(uuid()) @db.Uuid
   name String @db.VarChar(100)
   qualification String @db.VarChar(200)
@@ -486,6 +496,20 @@ model Doctor {
   consultations Consultation[]
   @@index([verificationStatus, acceptingAppointments])
   wellnessProducts WellnessProduct[]
+}
+
+// Private objects are never exposed through public Doctor DTOs or URLs.
+model DoctorCredential {
+  id String @id @default(uuid()) @db.Uuid
+  doctorId String @db.Uuid
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  kind String @db.VarChar(40)
+  fileName String @db.VarChar(120)
+  contentType String @db.VarChar(40)
+  size Int
+  objectKey String @unique @db.VarChar(200)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([doctorId, kind])
 }
 
 model ProgramCategory {

@@ -38,12 +38,12 @@ export async function dashboard(db: PrismaClient, env: Environment) {
   return { metrics, pending: [{ label: 'Doctor verification', value: pendingDoctors }, { label: 'Privacy requests', value: privacy },
     { label: 'Notification failures', value: notificationFailures }], environment: env.APP_ENV, readiness: readiness(env) };
 }
-export async function listOperations(db: PrismaClient, domain: string, page: number, q: string) {
+export async function listOperations(db: PrismaClient, domain: string, page: number, q: string, pending = false) {
   const range = { take: 21, skip: (page - 1) * 20 }; const match = { contains: q, mode: 'insensitive' as const };
   let items: unknown[];
   switch (domain) {
     case 'users': items = await db.user.findMany({ ...range, where: q ? { OR: [{ fullName: match }, { phone: match }] } : {}, select: userSelect, orderBy: { id: 'asc' } }); break;
-    case 'doctors': items = await db.doctor.findMany({ ...range, where: q ? { OR: [{ name: match }, { specialty: match }] } : {}, orderBy: { id: 'asc' } }); break;
+    case 'doctors': items = await db.doctor.findMany({ ...range, where: { ...(q ? { OR: [{ name: match }, { specialty: match }] } : {}), ...(pending ? { verificationStatus: 'PENDING_VERIFICATION' as const, registrationSubmittedAt: { not: null } } : {}) }, orderBy: { id: 'asc' } }); break;
     case 'programs': items = (await db.program.findMany({ ...range, where: q ? { title: match } : {}, orderBy: { id: 'asc' } })).map(programDto); break;
     case 'categories': items = await db.programCategory.findMany({ ...range, orderBy: { id: 'asc' } }); break;
     case 'products': items = await db.wellnessProduct.findMany({ ...range, where: q ? { name: match } : {}, orderBy: { id: 'asc' } }); break;

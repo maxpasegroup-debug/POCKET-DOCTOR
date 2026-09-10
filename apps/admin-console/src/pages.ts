@@ -1,3 +1,4 @@
+import { registrationReview } from './registration.ts';
 import { ApiClient, StaleRequest } from './api.ts';
 import { domains, table, displayValue, refundActionState, type Column, type Domain, type RecordData } from './catalog.ts';
 import { badge, button, confirmAction, el, empty, failure, human, link, loading, money, notice } from './dom.ts';
@@ -35,7 +36,7 @@ export function dashboard(context: PageContext) {
   }); return page;
 }
 export function listPage(domain: Domain, context: PageContext) {
-  const page = el('div', '', heading(domain.title, domain.description)), toolbar = el('div', 'toolbar'), body = el('div'); let pageNumber = 1, query = '', version = 0;
+  const page = el('div', '', heading(domain.title, domain.description)), toolbar = el('div', 'toolbar'), body = el('div'); let pageNumber = 1, query = '', version = 0, pendingOnly = false;
   if (domain.search) {
     const form = el('form', 'search-form'), input = el('input'); input.type = 'search'; input.placeholder = `Search ${domain.title.toLowerCase()}…`; input.setAttribute('aria-label', `Search ${domain.title.toLowerCase()}`); input.maxLength = 100;
     const submit = el('button', 'button secondary', 'Search'); submit.type = 'submit';
@@ -43,10 +44,11 @@ export function listPage(domain: Domain, context: PageContext) {
     form.addEventListener('submit', event => { event.preventDefault(); query = input.value.trim(); pageNumber = 1; fetchPage(); }); toolbar.append(form);
   } else toolbar.append(el('p', 'muted', 'Operational records · server-ordered results'));
   if (domain.create) toolbar.append(link(domain.id === 'categories' ? 'Add category' : `Create ${domain.id === 'plans' ? 'plan' : domain.id.slice(0, -1)}`, `/${domain.id}/new`, 'button primary'));
+  if (domain.id === 'doctors') toolbar.append(button('Toggle pending applications', () => { pendingOnly = !pendingOnly; pageNumber = 1; fetchPage(); }));
   page.append(toolbar, body);
   function fetchPage() {
     const current = ++version; const scoped = { ...context, alive: () => context.alive() && current === version };
-    const queryString = new URLSearchParams({ page: String(pageNumber), ...(query ? { q: query } : {}) });
+    const queryString = new URLSearchParams({ ...(pendingOnly ? {pending:'true'} : {}), page: String(pageNumber), ...(query ? { q: query } : {}) });
     void load(body, scoped, () => context.api.request<ListResult>(`/admin/operations/${domain.id}?${queryString}`), result => {
       if (!result.items.length) body.append(empty(query ? 'No matching records' : 'No records yet', query ? 'Try another search or clear your search.' : 'Records will appear here as activity begins.'));
       else body.append(table(result.items, domain.columns, domain.detail ? domain.id : undefined, domain.id === 'payments' ? item => paymentAction(item, scoped) : domain.id === 'notifications' ? item => notificationAction(item, scoped) : undefined));
@@ -97,7 +99,8 @@ export function detailPage(domain: Domain, id: string, context: PageContext) {
       if (counts && typeof counts === 'object') body.append(section('Activity totals', facts(counts as RecordData, ['enrollments', 'consultations', 'orders', 'subscriptions'].map(key => ({ key, label: human(key.replace(/([a-z])([A-Z])/g, '$1 $2')) })))));
       body.append(userActivity(id, context));
     }
-    if (domain.id === 'doctors') body.append(section('Professional profile & verification', editor(doctorFields, item, requestSave(`/admin/operations/doctors/${id}`, 'PATCH'), options), 'Confirm registration and qualifications before selecting Verified. Never enter assumed credentials.'), section('Appointment availability', availabilityEditor(item, id, context)));
+    if (domain.id === 'doctors' && item.registrationStartedAt) body.append(registrationReview(id, context));
+    if (domain.id === 'doctors') body.append(section('Professional profile & verification', editor(item.registrationStartedAt ? doctorFields.filter(f => f.key !== 'verificationStatus') : doctorFields, item, requestSave(`/admin/operations/doctors/${id}`, 'PATCH', payload => item.registrationStartedAt ? ({ ...payload, verificationStatus: item.verificationStatus }) : payload), options), 'Confirm registration and qualifications before selecting Verified. Never enter assumed credentials.'), section('Appointment availability', availabilityEditor(item, id, context)));
     if (domain.id === 'programs') {
       const referenceFields = programFields.map(field => ['doctorId', 'categoryId'].includes(field.key) ? {
         ...field, label: field.key === 'doctorId' ? 'Leading doctor' : 'Program category', lookup: {

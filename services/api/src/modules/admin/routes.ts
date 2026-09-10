@@ -17,8 +17,8 @@ export function registerAdminRoutes(app: FastifyInstance, env: Environment, db?:
   app.get('/api/v1/admin/operations/dashboard', async r => ({ data: await dashboard(database(r), env) }));
   app.get('/api/v1/admin/operations/settings', async r => { database(r); return { data: { environment: env.APP_ENV, readiness: readiness(env), policies: JSON.parse(env.LEGAL_DOCUMENTS) as unknown } }; });
   app.get('/api/v1/admin/operations/:domain', async r => {
-    const { domain } = parse(z.object({ domain: z.string() }), r.params); const q = parse(pagination, r.query);
-    return { data: await listOperations(database(r), domain, q.page, q.q) };
+    const { domain } = parse(z.object({ domain: z.string() }), r.params); const q = parse(pagination.extend({pending:z.enum(['true','false']).optional()}), r.query);
+    return { data: await listOperations(database(r), domain, q.page, q.q, domain === 'doctors' && q.pending === 'true') };
   });
   app.get('/api/v1/admin/operations/:domain/:id', async r => {
     const { id, domain } = params(r); return { data: await operationDetail(database(r), domain!, id) };
@@ -52,6 +52,7 @@ export function registerAdminRoutes(app: FastifyInstance, env: Environment, db?:
     const item = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "Doctor" WHERE "id" = ${id}::uuid FOR UPDATE`;
       const previous = await tx.doctor.findUnique({ where: { id } }); if (!previous) throw new ApiError(404, 'NOT_FOUND', 'Doctor not found.');
+      if (previous.registrationStartedAt && input.verificationStatus !== previous.verificationStatus) throw new ApiError(409, 'APPLICATION_REVIEW_REQUIRED', 'Use the application review controls for this doctor.');
       return tx.doctor.update({ where: { id }, data: { ...input, acceptingAppointments: input.acceptingAppointments && input.verificationStatus === 'VERIFIED',
         verifiedAt: input.verificationStatus === 'VERIFIED' && !previous.isDemo ? previous.verifiedAt ?? new Date() : null } });
     }); return { data: { item } };

@@ -1,3 +1,4 @@
+import { registrationStatus } from '../doctor-registration/service.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { Environment } from '../../config/env.js';
@@ -62,7 +63,7 @@ export function registerDoctorSessionRoutes(app: FastifyInstance, env: Environme
       : profile.verificationStatus !== 'VERIFIED' ? profile.verificationStatus
       : !profile.name.trim() || !profile.qualification.trim() || !profile.specialty.trim() || !profile.biography.trim() || profile.languages.length === 0 ? 'PROFILE_REQUIRED'
       : profile.isDemo && env.DEMO_CONSULTATIONS !== 'true' ? 'UNAVAILABLE' : 'READY';
-    return { data: { status, doctor: status === 'READY' ? await new ConsultationService(db!, env).profile(actor.userId) : null } };
+    return { data: { registration: profile?.registrationStartedAt ? { status: registrationStatus(profile), required: status !== 'READY' } : null, status, doctor: status === 'READY' ? await new ConsultationService(db!, env).profile(actor.userId) : null } };
   });
   app.delete('/api/v1/doctor/session', async (request, reply) => {
     checkOrigin(request, env);

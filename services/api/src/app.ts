@@ -1,3 +1,5 @@
+import { registerDoctorRegistrationRoutes } from './modules/doctor-registration/routes.js';
+import type { RegistrationDependencies } from './modules/doctor-registration/contracts.js';
 import { randomUUID } from 'node:crypto';
 import Fastify, { LogController } from 'fastify';
 import cors from '@fastify/cors';
@@ -22,7 +24,7 @@ import { registerPaymentWebhook } from './modules/payments/webhook.js';
 import { registerRequestBudgets } from './modules/auth/request-budget.js';
 import { ApiMetrics } from './observability.js';
 
-export async function buildApp(env: Environment, database?: Database) {
+export async function buildApp(env: Environment, database?: Database, registration: RegistrationDependencies = {}) {
   const metrics = new ApiMetrics();
   const app = Fastify({
     bodyLimit: 64 * 1024,
@@ -85,6 +87,7 @@ export async function buildApp(env: Environment, database?: Database) {
   registerPushRoutes(app, env, database?.client);
   registerPaymentWebhook(app, env, database?.client);
   registerIdentityRoutes(app, env, database?.client);
+  registerDoctorRegistrationRoutes(app, env, database?.client, registration);
   registerDoctorSessionRoutes(app, env, database?.client);
   registerProgramRoutes(app, env, database?.client);
   registerConsultationRoutes(app, env, database?.client);
