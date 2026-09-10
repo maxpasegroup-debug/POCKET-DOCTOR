@@ -143,11 +143,19 @@ const schema = z.object({
 
 export type Environment = z.infer<typeof schema>;
 
+// Only schema-owned variable names belong in this error, never input values.
+export class EnvironmentConfigurationError extends Error {
+  constructor(fields: readonly (keyof Environment)[]) {
+    super(`Invalid environment configuration: ${[...new Set(fields)].join(', ')}`);
+    this.name = 'EnvironmentConfigurationError';
+  }
+}
+
 export function readEnvironment(input: NodeJS.ProcessEnv = process.env): Environment {
   const result = schema.safeParse(input);
   if (!result.success) {
     // Never echo environment values, credentials or URLs in startup errors.
-    throw new Error(`Invalid environment configuration: ${[...new Set(result.error.issues.map(issue => issue.path.join('.')))].join(', ')}`);
+    throw new EnvironmentConfigurationError(result.error.issues.map(issue => issue.path[0] as keyof Environment));
   }
   return result.data;
 }

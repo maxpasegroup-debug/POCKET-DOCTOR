@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { configuredRegistration } from './modules/doctor-registration/local-store.js';
 import { buildApp } from './app.js';
-import { readEnvironment } from './config/env.js';
+import { EnvironmentConfigurationError, readEnvironment } from './config/env.js';
 import { createDatabase } from './database/database.js';
 
 async function main() {
@@ -26,7 +26,9 @@ async function main() {
   }
 }
 
-main().catch(() => {
-  console.error('Startup failed; check environment configuration.');
+main().catch((error: unknown) => {
+  console.error(error instanceof EnvironmentConfigurationError
+    ? error.message
+    : 'Startup failed; check environment configuration.');
   process.exitCode = 1;
 });

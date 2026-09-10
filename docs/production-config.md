@@ -1,5 +1,46 @@
 # Production configuration inventory
 
+## Railway startup configuration errors
+
+The API now prints `Invalid environment configuration: VARIABLE_NAME, ...` for
+validation failures. Only variable names are logged; supplied values and generic
+exception details remain hidden. Older builds replace this with the less useful
+`Startup failed; check environment configuration.` Redeploy the diagnostic change
+if the failed variable names are needed. The generic message alone cannot prove
+which deployed setting is wrong.
+
+For an initial deployment with external providers not yet configured, use
+APP_ENV=production, NODE_ENV=production and ADMIN_SECURITY_MODE=disabled.
+Supply DATABASE_URL through the Railway PostgreSQL service reference and a private,
+random SESSION_SECRET of at least 32 characters. Do not use a localhost database
+URL, sample credentials or a literal placeholder. HOST should be 0.0.0.0 and PORT
+should use Railway's provided port.
+
+Keep OTP_MODE, PAYMENT_MODE, AI_PROVIDER, EMAIL_PROVIDER, PUSH_PROVIDER,
+WHATSAPP_MODE and WHATSAPP_OUTBOUND disabled until their integrations are ready.
+Keep DEMO_PROGRAMS, DEMO_CONSULTATIONS, DEMO_WELLNESS and
+DOCTOR_REGISTRATION_DEFER_DOCUMENTS false, and DOCTOR_CREDENTIAL_STORAGE disabled.
+Remove unused sample provider credentials rather than submitting placeholder
+values to validators. CORS_ORIGINS may be empty until approved browser origins
+exist; configured production origins must be exact HTTPS origins.
+
+This restricted setup can serve health checks; disabled OTP and Admin modes do
+not provide login or Admin access. Existing validated integrations should retain
+their properly configured provider settings. Doctor document submission remains
+blocked until a production private-storage adapter and review policy exist.
+
+After configuration passes, check /api/v1/health/ready for database connectivity.
+Migrations remain a separate reviewed operation; no startup reset is performed.
+
+Local diagnostic-change validation (2026-09-10): build and type-check passed.
+The first concurrent suite reached 116 tests: 104 passed, 12 failed, none skipped;
+failures included database query timeouts and local storage subprocess failures
+(`artifacts/railway-startup-tests.txt`). After compilation finished, the unchanged
+suite run with `--test-concurrency=1` passed all 164 tests, none failed or skipped
+(`artifacts/railway-startup-tests-serial.txt`). New startup tests verify safe field
+names and the actual API process exit. Railway variables/deployment have not been
+validated by this local change.
+
 P7-A additions and current limitations are documented in
 [provider configuration](provider-configuration.md) and the
 [P7-A closure evidence](p7-a-provider-closure.md). Optional Twilio SMS, Resend
