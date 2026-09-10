@@ -13,7 +13,7 @@ class AppConfig {
     const name = String.fromEnvironment('APP_ENV', defaultValue: 'development');
     const developmentOtp = bool.fromEnvironment('SHOW_DEVELOPMENT_OTP');
     if ((kReleaseMode && name == 'development') ||
-        (developmentOtp && name != 'development')) {
+        (developmentOtp && (name == 'production' || !kDebugMode))) {
       throw StateError(
         'Release builds need an explicit staging/production configuration without development OTP.',
       );
@@ -31,6 +31,10 @@ class AppConfig {
   }
   final AppEnvironment environment;
   final bool showDevelopmentOtp;
+  bool get canPreviewOtp =>
+      kDebugMode &&
+      environment != AppEnvironment.production &&
+      showDevelopmentOtp;
   final Uri apiBaseUri;
   static Uri _validate(AppEnvironment environment, String value) {
     final uri = Uri.tryParse(value);

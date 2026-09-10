@@ -85,6 +85,8 @@ class ApiClient {
           'ADDRESS_LIMIT' => 'You can save up to 10 addresses.',
           'INVALID_STATE' =>
             'This action is not available for this appointment. Please refresh its status.',
+          'TEST_LOGIN_NOT_ALLOWED' =>
+            'OTP preview is available only for Patient test accounts.',
           'FORBIDDEN' => 'Your account does not have access to this action.',
           'SLOT_UNAVAILABLE' =>
             'This time is no longer available. Please choose another slot.',

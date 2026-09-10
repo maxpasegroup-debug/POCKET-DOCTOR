@@ -18,7 +18,7 @@ const schema = z.object({
   DOCTOR_CREDENTIAL_KEY: z.string().default(''),
   DOCTOR_CREDENTIAL_SCANNER: z.string().default(''),
   DOCTOR_REQUIRED_CREDENTIALS: z.string().refine(v => v === '' || v.split(',').every(k => ['QUALIFICATION','REGISTRATION','IDENTITY','ADDITIONAL'].includes(k))).default(''),
-  OTP_MODE: z.enum(['disabled', 'development', 'provider']).default('disabled'),
+  OTP_MODE: z.enum(['disabled', 'development', 'testing', 'provider']).default('disabled'),
   SMS_PROVIDER: z.enum(['disabled', 'twilio']).default('disabled'),
   TWILIO_ACCOUNT_SID: z.string().default(''),
   TWILIO_AUTH_TOKEN: z.string().default(''),
@@ -124,6 +124,9 @@ const schema = z.object({
   }
   if (env.OTP_MODE !== 'disabled' && env.SESSION_SECRET.length < 32) {
     ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'], message: 'Use at least 32 random characters' });
+  }
+  if (env.OTP_MODE === 'testing' && !['staging', 'test'].includes(env.APP_ENV)) {
+    ctx.addIssue({ code: 'custom', path: ['OTP_MODE'], message: 'Hosted testing OTP requires an isolated staging environment' });
   }
   if (deployed && !env.DATABASE_URL) {
     ctx.addIssue({ code: 'custom', path: ['DATABASE_URL'], message: 'Required in deployed environments' });

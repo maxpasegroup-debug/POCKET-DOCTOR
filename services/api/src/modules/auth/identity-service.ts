@@ -18,10 +18,26 @@ export class IdentityService implements SessionVerifier {
     private readonly sms: SmsOtpProvider = new TwilioSmsProvider(env)) {}
 
   private otpHash(id: string, code: string) {
-    return createHmac('sha256', this.env.SESSION_SECRET).update(`${id}:${code}`).digest('hex');
+    const scope = this.env.OTP_MODE === 'testing' ? 'testing:' : '';
+    return createHmac('sha256', this.env.SESSION_SECRET).update(`${scope}${id}:${code}`).digest('hex');
+  }
+
+  // Preview challenges and sessions cannot cross into real authentication mode.
+  private sessionHash(token: string) {
+    return hashToken(this.env.OTP_MODE === 'testing' ? `testing:${token}` : token);
+  }
+
+  private isTestingUser(user: { accountStatus: string; roles: { role: string }[] }) {
+    return user.accountStatus === 'ACTIVE' && user.roles.length === 1 && user.roles[0]?.role === 'USER';
   }
 
   async requestOtp(phone: string, purpose: OtpPurpose = 'LOGIN') {
+    if (this.env.OTP_MODE === 'testing') {
+      const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
+      if (purpose !== 'LOGIN' || (existing && !this.isTestingUser(existing))) {
+        throw new ApiError(403, 'TEST_LOGIN_NOT_ALLOWED', 'OTP preview is available only for Patient test accounts.');
+      }
+    }
     if (purpose === 'DOCTOR_LOGIN') {
       const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
       if (!existing) throw registrationRequired();
@@ -65,11 +81,13 @@ export class IdentityService implements SessionVerifier {
       await this.prisma.otpChallenge.updateMany({ where: { id }, data: { consumed: false } });
       return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, delivery: 'provider' as const };
     }
-    return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, developmentCode: code, delivery: 'development' as const };
+    return { challengeId: id, expiresInSeconds: 300, resendAfterSeconds: 60, developmentCode: code,
+      delivery: this.env.OTP_MODE === 'testing' ? 'testing' as const : 'development' as const };
   }
 
   async verifyOtp(challengeId: string, code: string, requestId: string = randomUUID(), purpose: OtpPurpose = 'LOGIN') {
     if (this.env.OTP_MODE === 'disabled') throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet.');
+    if (this.env.OTP_MODE === 'testing' && purpose !== 'LOGIN') throw invalidOtp();
     const token = randomBytes(32).toString('base64url');
     const result = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "OtpChallenge" WHERE "id" = ${challengeId}::uuid FOR UPDATE`;
@@ -89,6 +107,7 @@ export class IdentityService implements SessionVerifier {
         : await tx.user.upsert({ where: { phone: challenge.phone },
         create: { phone: challenge.phone, roles: { create: { role: purpose === 'DOCTOR_REGISTRATION' ? 'DOCTOR' : 'USER' } } }, update: {}, include: { roles: true } });
       if (!user || (purpose === 'DOCTOR_LOGIN' && !user.roles.some(r => r.role === 'DOCTOR'))) return null;
+      if (this.env.OTP_MODE === 'testing' && !this.isTestingUser(user)) return null;
       // Re-check inside the transaction: ordinary sign-in could have created USER
       // after a registration challenge was requested. Never promote that account.
       if (purpose === 'DOCTOR_REGISTRATION' && !user.roles.some(r => r.role === 'DOCTOR')) return null;
@@ -101,8 +120,8 @@ export class IdentityService implements SessionVerifier {
       }
       if (user.accountStatus !== 'ACTIVE') return null;
       const privileged = user.roles.some(r => r.role === 'ADMIN' || r.role === 'DOCTOR');
-      const expiresAt = new Date(Date.now() + (privileged ? 3600000 : 7 * 24 * 3600000));
-      const session = await tx.session.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt } });
+      const expiresAt = new Date(Date.now() + (privileged || this.env.OTP_MODE === 'testing' ? 3600000 : 7 * 24 * 3600000));
+      const session = await tx.session.create({ data: { userId: user.id, tokenHash: this.sessionHash(token), expiresAt } });
       if (user.roles.some(role => role.role === 'ADMIN')) {
         await tx.adminAuditEvent.create({ data: { actorId: user.id, action: 'ADMIN_LOGIN', resourceId: session.id, requestId, result: 'SUCCEEDED' } });
       }
@@ -114,8 +133,9 @@ export class IdentityService implements SessionVerifier {
 
   async verify(token: string): Promise<Principal | null> {
     if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-    const session = await this.prisma.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: { include: { roles: true } } } });
+    const session = await this.prisma.session.findUnique({ where: { tokenHash: this.sessionHash(token) }, include: { user: { include: { roles: true } } } });
     if (!session || session.expiresAt <= new Date() || session.user.accountStatus !== 'ACTIVE') return null;
+    if (this.env.OTP_MODE === 'testing' && !this.isTestingUser(session.user)) return null;
     return { userId: session.userId, sessionId: session.id, roles: session.user.roles.map(role => role.role) };
   }
   async getUser(principal: Principal) {

@@ -1,5 +1,9 @@
 # Production configuration inventory
 
+For an isolated dummy-data Railway environment only, see
+[hosted OTP testing](hosted-otp-testing.md). It uses `APP_ENV=staging` and
+`OTP_MODE=testing`; production continues to forbid preview codes.
+
 ## Railway startup configuration errors
 
 The API now prints `Invalid environment configuration: VARIABLE_NAME, ...` for

@@ -76,12 +76,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             ),
             onSubmitted: (_) => controller.verifyOtp(_code.text),
           ),
-          if (config.environment == AppEnvironment.development &&
-              config.showDevelopmentOtp &&
-              challenge.developmentCode != null) ...[
+          if (config.canPreviewOtp && challenge.developmentCode != null) ...[
             const SizedBox(height: 16),
             SelectableText(
-              'Development preview · No SMS sent\nCode: ${challenge.developmentCode}',
+              'Testing only · No SMS sent\nCode: ${challenge.developmentCode}',
               key: const Key('development-code'),
             ),
           ],

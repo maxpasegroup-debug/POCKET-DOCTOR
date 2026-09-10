@@ -1,0 +1,5 @@
+{
+  "APP_ENV": "staging",
+  "API_BASE_URL": "https://pocket-doctor-production.up.railway.app/api/v1",
+  "SHOW_DEVELOPMENT_OTP": true
+}

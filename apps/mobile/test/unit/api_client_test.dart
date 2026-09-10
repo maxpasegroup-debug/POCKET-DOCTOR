@@ -5,6 +5,25 @@ import 'package:pocket_doctor/core/networking/api_client.dart';
 
 void main() {
   final base = Uri.parse('http://localhost:3000/api/v1');
+  test('testing account restrictions have a clear safe message', () async {
+    final transport = MockClient(
+      (_) async => http.Response(
+        '{"error":{"code":"TEST_LOGIN_NOT_ALLOWED","message":"private details"}}',
+        403,
+      ),
+    );
+    addTearDown(transport.close);
+    await expectLater(
+      ApiClient(transport, base).request('POST', '/auth/otp/request'),
+      throwsA(
+        isA<ApiFailure>().having(
+          (error) => error.message,
+          'message',
+          'OTP preview is available only for Patient test accounts.',
+        ),
+      ),
+    );
+  });
   test('program search query is encoded separately from route path', () async {
     final transport = MockClient((request) async {
       expect(request.url.path, '/api/v1/programs');
