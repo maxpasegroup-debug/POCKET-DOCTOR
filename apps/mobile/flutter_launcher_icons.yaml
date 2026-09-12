@@ -1,0 +1,9 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/brand/patient_app_icon.png
+  adaptive_icon_background: '#FFFFFF'
+  adaptive_icon_foreground: assets/brand/patient_app_icon.png
+  adaptive_icon_foreground_inset: 24
+  remove_alpha_ios: true
+  background_color_ios: '#FFFFFF'
