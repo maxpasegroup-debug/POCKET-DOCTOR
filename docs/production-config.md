@@ -1,5 +1,10 @@
 # Production configuration inventory
 
+For the 2026-09-14 release audit, complete API/worker variable matrix and exact
+Railway service/config-file paths, see [Phase 9](phase-9.md). The existing hosted
+Patient testing environment must retain its staging/testing settings. The
+restricted production bootstrap below is not an instruction to replace them.
+
 For an isolated dummy-data Railway environment only, see
 [hosted OTP testing](hosted-otp-testing.md). It uses `APP_ENV=staging` and
 `OTP_MODE=testing`; production continues to forbid preview codes.

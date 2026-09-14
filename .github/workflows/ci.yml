@@ -50,6 +50,7 @@ jobs:
           npm run db:validate
           npm run db:deploy
           npm run db:check
+          npm run db:audit
           npm test
           npm audit --audit-level=high
       - name: Source credential check

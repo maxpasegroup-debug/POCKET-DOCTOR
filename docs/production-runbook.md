@@ -1,5 +1,14 @@
 # Production runbook
 
+## Phase 9 controlled release
+
+Use [Phase 9](phase-9.md) for the current service settings, environment inventory,
+release evidence and outstanding validation. `npm run db:audit` is a read-only
+migration-history/checksum check using the migration/audit identity. Run it before
+and after a separately approved migration; it never applies schema changes.
+Neither API nor worker startup runs migrations. Preserve the working hosted
+Patient testing environment and do not deploy until the remaining checks pass.
+
 ## P7-A provider changes
 
 Read [provider configuration](provider-configuration.md) and the

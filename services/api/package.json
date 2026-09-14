@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:check": "tsx scripts/check-database.ts",
+    "db:audit": "tsx scripts/check-migrations.ts",
     "auth:cleanup": "tsx scripts/cleanup-auth.ts",
     "programs:seed": "tsx scripts/seed-programs.ts",
     "consultations:seed": "tsx scripts/seed-consultations.ts",
