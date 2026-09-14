@@ -9,7 +9,7 @@ void main() {
   if (source == null) {
     throw StateError('The Patient icon source must be a valid PNG.');
   }
-  final square = img.copyResize(
+  final resized = img.copyResize(
     source,
     width: 1024,
     height: 1024,
@@ -17,6 +17,9 @@ void main() {
     backgroundColor: img.ColorRgb8(255, 255, 255),
     interpolation: img.Interpolation.cubic,
   );
+  final square = img.Image(width: 1024, height: 1024, numChannels: 3);
+  img.fill(square, color: img.ColorRgb8(255, 255, 255));
+  img.compositeImage(square, resized);
   File(
     'assets/brand/patient_app_icon.png',
   ).writeAsBytesSync(img.encodePng(square));

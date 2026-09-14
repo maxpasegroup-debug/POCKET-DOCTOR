@@ -3,15 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/phase_one_widgets.dart';
 import '../application/program_providers.dart';
-import '../domain/program_models.dart';
 import 'program_widgets.dart';
-
-final homeProgramsProvider = FutureProvider<List<Program>>(
-  (ref) => ref
-      .watch(programRepositoryProvider)
-      .discover({})
-      .then((page) => page.programs),
-);
 
 class HomePrograms extends ConsumerWidget {
   const HomePrograms({super.key});
@@ -60,9 +52,10 @@ class HomePrograms extends ConsumerWidget {
         value: ref.watch(homeProgramsProvider),
         onRetry: () => ref.invalidate(homeProgramsProvider),
         builder: (items) {
-          final featured = items
-              .where((p) => p.featured && !p.isLive)
-              .firstOrNull;
+          final recorded = items.where((p) => !p.isLive);
+          final featured =
+              recorded.where((p) => p.featured).firstOrNull ??
+              recorded.firstOrNull;
           final live = items.where((p) => p.isLive).firstOrNull;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,

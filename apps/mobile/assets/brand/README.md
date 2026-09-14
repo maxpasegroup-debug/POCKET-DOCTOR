@@ -12,7 +12,7 @@ icons remain separate from the mobile launcher icon.
 ## Patient launcher icon
 
 The user-supplied Patient app icon is preserved without modification at
-`patient_app_icon_source.png` (received 2026-09-12). This launcher asset does not
+`patient_app_icon_source.png` (updated from `appicon.png` on 2026-09-14). This launcher asset does not
 replace the separate in-app logo automatically.
 
 `patient_app_icon.png` is a derived 1024 × 1024 image: the complete source is fitted

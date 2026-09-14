@@ -58,6 +58,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
     container.read(appRouterProvider).go('/assistant');
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Start a conversation'));
@@ -107,6 +108,7 @@ void main() {
         ),
       );
       expect(find.text('POCKET DOCTOR'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
       expect(find.text('Understand\nyour health.'), findsOneWidget);
       for (var i = 0; i < 3; i++) {
@@ -254,6 +256,7 @@ void main() {
             ),
           ),
         );
+        await tester.pump(const Duration(seconds: 2));
         final router = container.read(appRouterProvider);
         for (final path in [
           '/home',
@@ -359,6 +362,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
     final router = container.read(appRouterProvider);
     router.go('/profile');
     await tester.pumpAndSettle();

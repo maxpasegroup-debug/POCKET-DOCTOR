@@ -36,6 +36,12 @@ final programDiscoveryProvider = FutureProvider<ProgramPage>(
 final programCategoriesProvider = FutureProvider<List<ProgramCategory>>(
   (ref) => ref.watch(programRepositoryProvider).categories(),
 );
+final homeProgramsProvider = FutureProvider<List<Program>>(
+  (ref) => ref
+      .watch(programRepositoryProvider)
+      .discover({})
+      .then((page) => page.programs),
+);
 final programDetailProvider = FutureProvider.autoDispose
     .family<Program, String>(
       (ref, id) => ref.watch(programRepositoryProvider).detail(id),
@@ -72,6 +78,7 @@ class ProgramActions extends Notifier<AsyncValue<void>> {
     ref.invalidate(myProgramsProvider);
     ref.invalidate(programDiscoveryProvider);
     ref.invalidate(recommendedProgramsProvider);
+    ref.invalidate(homeProgramsProvider);
   }
 
   Future<bool> enroll(String id) async {

@@ -21,8 +21,8 @@ class SplashScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const BrandLockup(showTagline: true, onDark: true),
-                  const SizedBox(height: 32),
-                  if (auth.error != null)
+                  if (auth.error != null) ...[
+                    const SizedBox(height: 32),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -31,12 +31,8 @@ class SplashScreen extends ConsumerWidget {
                           onRetry: ref.read(authProvider.notifier).initialize,
                         ),
                       ),
-                    )
-                  else
-                    Semantics(
-                      label: 'Opening your health space',
-                      child: CircularProgressIndicator(color: Colors.white),
                     ),
+                  ],
                   const SizedBox(height: 48),
                   const Text(
                     'Better Health.\nA Brighter You.',

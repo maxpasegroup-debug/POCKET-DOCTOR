@@ -3,9 +3,14 @@ import { configuredRegistration } from './modules/doctor-registration/local-stor
 import { buildApp } from './app.js';
 import { EnvironmentConfigurationError, readEnvironment } from './config/env.js';
 import { createDatabase } from './database/database.js';
+import { assertRailwayVolume, railwayScanner } from './modules/doctor-registration/railway-volume.js';
 
 async function main() {
   const env = readEnvironment();
+  if (env.DOCTOR_CREDENTIAL_STORAGE === 'railway-volume') {
+    assertRailwayVolume(env);
+    await railwayScanner.initialize();
+  }
   const database = env.DATABASE_URL ? createDatabase(env.DATABASE_URL) : undefined;
   const app = await buildApp(env, database, configuredRegistration(env));
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {

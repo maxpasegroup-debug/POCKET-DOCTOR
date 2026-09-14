@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/networking/api_client.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../programs/application/program_providers.dart';
+import '../../wellness/application/commerce_providers.dart';
 import '../../assistant/application/assistant_providers.dart'
     show assistantRequestKey;
 import '../data/membership_repository.dart';
@@ -61,6 +63,20 @@ class MembershipActions extends Notifier<AsyncValue<void>> {
         state = const AsyncData(null);
         ref.invalidate(currentMembershipProvider);
         ref.invalidate(membershipTransactionsProvider);
+        ref.invalidate(membershipEventsProvider);
+        // Membership can change access and server-calculated prices on screens
+        // retained below this route. Refetch; never infer benefits in the client.
+        ref.invalidate(programDetailProvider);
+        ref.invalidate(programOverviewProvider);
+        ref.invalidate(programLessonProvider);
+        ref.invalidate(myProgramsProvider);
+        ref.invalidate(programDiscoveryProvider);
+        ref.invalidate(recommendedProgramsProvider);
+        ref.invalidate(homeProgramsProvider);
+        ref.invalidate(wellnessProductProvider);
+        ref.invalidate(productDiscoveryProvider);
+        ref.invalidate(wellnessCartProvider);
+        ref.invalidate(checkoutQuoteProvider);
       }
       return value;
     } catch (e, s) {

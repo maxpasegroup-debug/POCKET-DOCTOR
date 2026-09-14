@@ -56,6 +56,7 @@ void main() {
         ),
       ),
     );
+    await tester.pump(const Duration(seconds: 2));
     container.read(appRouterProvider).go(path);
     await tester.pumpAndSettle();
     return container;
