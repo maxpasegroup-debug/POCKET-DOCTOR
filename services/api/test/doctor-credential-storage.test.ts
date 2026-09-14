@@ -56,3 +56,25 @@ test('local test storage is disabled by default and forbidden in deployed enviro
   for(const APP_ENV of ['production','staging'])assert.throws(()=>readEnvironment({APP_ENV,DOCTOR_CREDENTIAL_STORAGE:'local-test'}));
   assert.throws(()=>readEnvironment({DOCTOR_REQUIRED_CREDENTIALS:'INVENTED'}));
 });
+test('fully configured local storage rejects every production environment combination',()=>{
+  const local = {
+    APP_ENV:'development',NODE_ENV:'development',ADMIN_SECURITY_MODE:'disabled',
+    DATABASE_URL:'postgresql://localhost/credential_guard_test',SESSION_SECRET:randomBytes(32).toString('hex'),
+    DOCTOR_CREDENTIAL_STORAGE:'local-test',DOCTOR_CREDENTIAL_ROOT:path.resolve('private-test-root'),
+    DOCTOR_CREDENTIAL_SCANNER:path.resolve('MpCmdRun.exe'),DOCTOR_CREDENTIAL_KEY:randomBytes(32).toString('base64'),
+  };
+  assert.doesNotThrow(()=>readEnvironment(local));
+  assert.doesNotThrow(()=>readEnvironment({...local,APP_ENV:'test',NODE_ENV:'test'}));
+  for(const [APP_ENV,NODE_ENV] of [['production','production'],['staging','production'],['development','production'],['test','production']]) {
+    const input={...local,APP_ENV,NODE_ENV};
+    if(APP_ENV==='production'||APP_ENV==='staging') {
+      assert.doesNotThrow(()=>readEnvironment({...input,DOCTOR_CREDENTIAL_STORAGE:'disabled'}));
+      assert.throws(()=>readEnvironment(input),/DOCTOR_CREDENTIAL_STORAGE/);
+    } else {
+      // The existing global runtime guard already rejects this mismatch.
+      assert.throws(()=>readEnvironment(input),/APP_ENV/);
+    }
+  }
+  // Defense in depth for callers supplying a parsed/constructed Environment.
+  assert.throws(()=>configuredRegistration({...readEnvironment(local),NODE_ENV:'production'}));
+});
