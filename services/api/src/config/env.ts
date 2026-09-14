@@ -20,6 +20,7 @@ const schema = z.object({
   RAILWAY_VOLUME_MOUNT_PATH: z.string().default(''),
   DOCTOR_REQUIRED_CREDENTIALS: z.string().refine(v => v === '' || v.split(',').every(k => ['QUALIFICATION','REGISTRATION','IDENTITY','ADDITIONAL'].includes(k))).default(''),
   OTP_MODE: z.enum(['disabled', 'development', 'testing', 'provider']).default('disabled'),
+  OTP_TEST_ACCOUNTS: z.string().default('{}'),
   SMS_PROVIDER: z.enum(['disabled', 'twilio']).default('disabled'),
   TWILIO_ACCOUNT_SID: z.string().default(''),
   TWILIO_AUTH_TOKEN: z.string().default(''),
@@ -61,6 +62,15 @@ const schema = z.object({
   WHATSAPP_BUSINESS_ID: z.string().regex(/^\d*$/).default(''),
 }).superRefine((env, ctx) => {
   const deployed = env.APP_ENV === 'staging' || env.APP_ENV === 'production';
+  try {
+    const accounts = z.record(z.string().regex(/^[a-f0-9]{64}$/), z.enum(['PATIENT', 'DOCTOR']))
+      .parse(JSON.parse(env.OTP_TEST_ACCOUNTS));
+    if (Object.keys(accounts).length > 50 || (Object.keys(accounts).length > 0 &&
+      (env.OTP_MODE !== 'testing' || !['staging', 'test'].includes(env.APP_ENV)))) throw new Error();
+  } catch {
+    ctx.addIssue({ code: 'custom', path: ['OTP_TEST_ACCOUNTS'],
+      message: 'Configure at most 50 explicit synthetic identities for hosted testing only' });
+  }
   if (env.DOCTOR_CREDENTIAL_STORAGE === 'railway-volume') {
     // Report the failing prerequisite, not the valid storage mode. Startup logs
     // include only these schema-owned field names, never their private values.

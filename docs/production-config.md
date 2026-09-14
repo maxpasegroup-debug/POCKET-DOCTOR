@@ -6,8 +6,9 @@ Patient testing environment must retain its staging/testing settings. The
 restricted production bootstrap below is not an instruction to replace them.
 
 For an isolated dummy-data Railway environment only, see
-[hosted OTP testing](hosted-otp-testing.md). It uses `APP_ENV=staging` and
-`OTP_MODE=testing`; production continues to forbid preview codes.
+[hosted staging authentication](hosted-testing-authentication.md). It uses
+`APP_ENV=staging`, `OTP_MODE=testing`, and an explicit private `OTP_TEST_ACCOUNTS`
+map for synthetic Patient/Doctor identities; production forbids preview codes.
 
 ## Railway startup configuration errors
 

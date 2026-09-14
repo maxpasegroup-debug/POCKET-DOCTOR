@@ -19,7 +19,7 @@ void main() {
         isA<ApiFailure>().having(
           (error) => error.message,
           'message',
-          'OTP preview is available only for Patient test accounts.',
+          'This account is not enabled for Patient staging testing. Use your configured synthetic Patient account.',
         ),
       ),
     );

@@ -86,7 +86,7 @@ class ApiClient {
           'INVALID_STATE' =>
             'This action is not available for this appointment. Please refresh its status.',
           'TEST_LOGIN_NOT_ALLOWED' =>
-            'OTP preview is available only for Patient test accounts.',
+            'This account is not enabled for Patient staging testing. Use your configured synthetic Patient account.',
           'FORBIDDEN' => 'Your account does not have access to this action.',
           'SLOT_UNAVAILABLE' =>
             'This time is no longer available. Please choose another slot.',

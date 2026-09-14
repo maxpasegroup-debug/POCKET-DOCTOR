@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import test from 'node:test';
 import { buildApp } from '../src/app.js';
 import { readEnvironment } from '../src/config/env.js';
@@ -26,7 +26,10 @@ test('hosted testing OTP lifecycle and privilege isolation on PostgreSQL', {
   const identity = new IdentityService(db, env, { send: async () => { assert.fail('Testing must never send SMS'); } });
   const realIdentity = new IdentityService(db, { ...env, OTP_MODE: 'provider' });
   const phones: string[] = [];
-  const phone = () => { const value = `+919${randomInt(1_000_000_000).toString().padStart(9, '0')}`; phones.push(value); return value; };
+  const accounts: Record<string,string> = {};
+  const phone = () => { const value = `+919${randomInt(1_000_000_000).toString().padStart(9, '0')}`; phones.push(value);
+    accounts[createHash('sha256').update(value).digest('hex')] = 'PATIENT';
+    env.OTP_TEST_ACCOUNTS = JSON.stringify(accounts); return value; };
   let requests = 0;
   const call = (path: string, payload?: object, token?: string) => app.inject({
     method: payload ? 'POST' : 'GET', url: `/api/v1${path}`, remoteAddress: `127.0.2.${++requests}`,
@@ -34,7 +37,7 @@ test('hosted testing OTP lifecycle and privilege isolation on PostgreSQL', {
   });
   const challenge = async (number: string) => {
     const response = await call('/auth/otp/request', { phone: number });
-    assert.equal(response.statusCode, 200, response.body);
+    assert.equal(response.statusCode, 200);
     return response.json().data as { challengeId: string; developmentCode: string; delivery: string };
   };
   const verify = (value: { challengeId: string; developmentCode: string }) => call('/auth/otp/verify', {
@@ -56,7 +59,7 @@ test('hosted testing OTP lifecycle and privilege isolation on PostgreSQL', {
     assert.notEqual(stored.codeHash, value.developmentCode);
     assert.equal((await call('/auth/otp/request', { phone: number })).statusCode, 429);
     const response = await verify(value);
-    assert.equal(response.statusCode, 200, response.body);
+    assert.equal(response.statusCode, 200);
     const data = response.json().data;
     token = data.token; userId = data.user.id;
     assert.deepEqual(data.user.roles, ['USER']);
@@ -84,8 +87,8 @@ test('hosted testing OTP lifecycle and privilege isolation on PostgreSQL', {
     const number = phone();
     await db.user.create({ data: { phone: number, accountStatus: 'SUSPENDED', roles: { create: { role: 'USER' } } } });
     assert.equal((await call('/auth/otp/request', { phone: number })).statusCode, 403);
-    await assert.rejects(identity.requestOtp(phone(), 'DOCTOR_REGISTRATION'), /Patient test accounts/);
-    await assert.rejects(identity.requestOtp(phone(), 'DOCTOR_LOGIN'), /Patient test accounts/);
+    await assert.rejects(identity.requestOtp(phone(), 'DOCTOR_REGISTRATION'), /staging test sign-in/);
+    await assert.rejects(identity.requestOtp(phone(), 'DOCTOR_LOGIN'), /staging test sign-in/);
   });
   await t.test('role changes after request or after login cannot promote preview access', async () => {
     const number = phone();

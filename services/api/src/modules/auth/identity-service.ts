@@ -11,14 +11,15 @@ const unauthorized = () => new ApiError(401, 'UNAUTHENTICATED', 'Please sign in 
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 type OtpPurpose = 'LOGIN' | 'DOCTOR_LOGIN' | 'DOCTOR_REGISTRATION';
 const registrationRequired = () => new ApiError(409, 'DOCTOR_REGISTRATION_REQUIRED', 'No doctor account exists yet. Choose Register as Doctor to apply.');
+const testingDenied = () => new ApiError(403, 'TEST_LOGIN_NOT_ALLOWED', 'This account is not eligible for this staging test sign-in. Use the configured synthetic account for this app.');
 
 // Delivery is configurable; all roles reuse this same OTP and session lifecycle.
 export class IdentityService implements SessionVerifier {
   constructor(private readonly prisma: PrismaClient, private readonly env: Environment,
     private readonly sms: SmsOtpProvider = new TwilioSmsProvider(env)) {}
 
-  private otpHash(id: string, code: string) {
-    const scope = this.env.OTP_MODE === 'testing' ? 'testing:' : '';
+  private otpHash(id: string, code: string, purpose: OtpPurpose) {
+    const scope = this.env.OTP_MODE === 'testing' ? `testing:${purpose}:` : '';
     return createHmac('sha256', this.env.SESSION_SECRET).update(`${scope}${id}:${code}`).digest('hex');
   }
 
@@ -27,16 +28,40 @@ export class IdentityService implements SessionVerifier {
     return hashToken(this.env.OTP_MODE === 'testing' ? `testing:${token}` : token);
   }
 
-  private isTestingUser(user: { accountStatus: string; roles: { role: string }[] }) {
-    return user.accountStatus === 'ACTIVE' && user.roles.length === 1 && user.roles[0]?.role === 'USER';
+  private testingKind(phone: string | null) {
+    if (!phone || !['staging', 'test'].includes(this.env.APP_ENV)) return undefined;
+    try {
+      const accounts = JSON.parse(this.env.OTP_TEST_ACCOUNTS) as Record<string, unknown>;
+      const kind = accounts[createHash('sha256').update(phone).digest('hex')];
+      return kind === 'PATIENT' || kind === 'DOCTOR' ? kind : undefined;
+    } catch { return undefined; }
+  }
+
+  private isTestingUser(user: { phone: string | null; accountStatus: string; roles: { role: string }[] }) {
+    const kind = this.testingKind(user.phone);
+    return !!kind && user.accountStatus === 'ACTIVE' && user.roles.length === 1 &&
+      user.roles[0]?.role === (kind === 'PATIENT' ? 'USER' : 'DOCTOR');
+  }
+
+  private async testingEligible(db: Pick<PrismaClient, 'doctor'>, phone: string,
+    user: { id: string; phone: string | null; accountStatus: string; roles: { role: string }[] } | null, purpose: OtpPurpose) {
+    const kind = this.testingKind(phone);
+    if (kind !== (purpose === 'LOGIN' ? 'PATIENT' : 'DOCTOR') || (user && !this.isTestingUser(user))) return false;
+    if (purpose === 'LOGIN') return true;
+    // An explicitly listed new Doctor identity still gets the existing
+    // registration-required response; sign-in below never provisions a USER.
+    if (!user) return true;
+    const doctor = await db.doctor.findUnique({ where: { userId: user.id } });
+    if (purpose === 'DOCTOR_REGISTRATION') return !doctor || !['SUSPENDED', 'INACTIVE'].includes(doctor.verificationStatus);
+    return !!doctor && doctor.verificationStatus === 'VERIFIED' && !doctor.isDemo &&
+      !!doctor.name.trim() && !!doctor.qualification.trim() && !!doctor.specialty.trim() &&
+      !!doctor.biography.trim() && doctor.languages.length > 0;
   }
 
   async requestOtp(phone: string, purpose: OtpPurpose = 'LOGIN') {
     if (this.env.OTP_MODE === 'testing') {
       const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
-      if (purpose !== 'LOGIN' || (existing && !this.isTestingUser(existing))) {
-        throw new ApiError(403, 'TEST_LOGIN_NOT_ALLOWED', 'OTP preview is available only for Patient test accounts.');
-      }
+      if (!await this.testingEligible(this.prisma, phone, existing, purpose)) throw testingDenied();
     }
     if (purpose === 'DOCTOR_LOGIN') {
       const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
@@ -67,7 +92,7 @@ export class IdentityService implements SessionVerifier {
       }
       // Doctor sign-in is ordinary LOGIN with a stricter account lookup, not a
       // new authentication purpose or database lifecycle.
-      const data = { id, purpose: purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose, codeHash: this.otpHash(id, code), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
+      const data = { id, purpose: purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose, codeHash: this.otpHash(id, code, purpose), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
         windowStartedAt: sameWindow ? old.windowStartedAt : now,
         requestCount: sameWindow ? old.requestCount + 1 : 1, attempts: 0, consumed: this.env.OTP_MODE === 'provider' };
       await tx.otpChallenge.upsert({ where: { phone }, create: { phone, ...data }, update: data });
@@ -87,14 +112,17 @@ export class IdentityService implements SessionVerifier {
 
   async verifyOtp(challengeId: string, code: string, requestId: string = randomUUID(), purpose: OtpPurpose = 'LOGIN') {
     if (this.env.OTP_MODE === 'disabled') throw new ApiError(503, 'OTP_UNAVAILABLE', 'Sign-in is not available yet.');
-    if (this.env.OTP_MODE === 'testing' && purpose !== 'LOGIN') throw invalidOtp();
     const token = randomBytes(32).toString('base64url');
     const result = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "OtpChallenge" WHERE "id" = ${challengeId}::uuid FOR UPDATE`;
       const challenge = await tx.otpChallenge.findUnique({ where: { id: challengeId } });
       const storedPurpose = purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose;
       if (!challenge || challenge.purpose !== storedPurpose || challenge.consumed || challenge.attempts >= 5 || challenge.expiresAt <= new Date()) return null;
-      if (!timingSafeEqual(Buffer.from(challenge.codeHash, 'hex'), Buffer.from(this.otpHash(challengeId, code), 'hex'))) {
+      if (this.env.OTP_MODE === 'testing') {
+        const existing = await tx.user.findUnique({ where: { phone: challenge.phone }, include: { roles: true } });
+        if (!await this.testingEligible(tx, challenge.phone, existing, purpose)) return null;
+      }
+      if (!timingSafeEqual(Buffer.from(challenge.codeHash, 'hex'), Buffer.from(this.otpHash(challengeId, code, purpose), 'hex'))) {
         // Return, don't throw: failed-attempt increments must commit.
         await tx.otpChallenge.update({ where: { id: challengeId }, data: { attempts: { increment: 1 } } });
         return null;
@@ -136,6 +164,10 @@ export class IdentityService implements SessionVerifier {
     const session = await this.prisma.session.findUnique({ where: { tokenHash: this.sessionHash(token) }, include: { user: { include: { roles: true } } } });
     if (!session || session.expiresAt <= new Date() || session.user.accountStatus !== 'ACTIVE') return null;
     if (this.env.OTP_MODE === 'testing' && !this.isTestingUser(session.user)) return null;
+    if (this.env.OTP_MODE === 'testing' && this.testingKind(session.user.phone) === 'DOCTOR') {
+      const doctor = await this.prisma.doctor.findUnique({ where: { userId: session.user.id } });
+      if (!doctor || ['SUSPENDED', 'INACTIVE'].includes(doctor.verificationStatus)) return null;
+    }
     return { userId: session.userId, sessionId: session.id, roles: session.user.roles.map(role => role.role) };
   }
   async getUser(principal: Principal) {

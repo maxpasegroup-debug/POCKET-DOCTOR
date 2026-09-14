@@ -1,5 +1,9 @@
 # Hosted OTP preview for dummy Patient accounts
 
+> Superseded for current deployments: use [Hosted staging authentication](hosted-testing-authentication.md).
+> Patient and Doctor preview now require an explicit private `OTP_TEST_ACCOUNTS` map.
+> The Patient-only behavior and validation below are the historical 2026-09-10 implementation.
+
 This mode supports phone → server-generated six-digit code shown in the debug app
 → verification → Patient session. No SMS is sent. It does not prove ownership of
 a phone number. Use only a separate dummy-data database, never real user records.
