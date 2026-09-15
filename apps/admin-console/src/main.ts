@@ -1,5 +1,5 @@
 import './style.css';
-import { validateApiBase, StaleRequest } from './api.ts';
+import { browserApiBase, StaleRequest } from './api.ts';
 import { AdminAuth } from './auth.ts';
 import { domains, routeFromHash } from './catalog.ts';
 import { button, el, empty, link, notice } from './dom.ts';
@@ -49,8 +49,8 @@ function render() {
 }
 try {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  const base = validateApiBase(configured ?? (import.meta.env.DEV ? 'http://127.0.0.1:3000/api/v1' : ''));
-  auth = new AdminAuth(root, base, render, clearView);
+  const base = browserApiBase(configured, import.meta.env.DEV, import.meta.env.VITE_DEV_API_PROXY === true, location.origin);
+  auth = new AdminAuth(root, base, render, clearView, configured ?? base);
   window.addEventListener('hashchange', () => { if (auth.authenticated) render(); });
   auth.reset();
 } catch (error) { root.append(el('main', 'configuration-error', el('h1', '', 'Console configuration needed'), notice((error as Error).message, true), el('p', '', 'Set VITE_API_BASE_URL to the approved API address and rebuild the console.'))); }

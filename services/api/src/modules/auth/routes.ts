@@ -12,16 +12,17 @@ export function registerIdentityRoutes(app: FastifyInstance, env: Environment, p
     if (!identity) throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'We could not connect right now. Please try again later.');
     return identity;
   };
-  app.post<{ Body: { phone: string; context?: 'DOCTOR' } }>('/api/v1/auth/otp/request', {
+  const purpose = (context?: 'DOCTOR' | 'ADMIN') => context === 'ADMIN' ? 'ADMIN_LOGIN' as const : context === 'DOCTOR' ? 'DOCTOR_LOGIN' as const : 'LOGIN' as const;
+  app.post<{ Body: { phone: string; context?: 'DOCTOR' | 'ADMIN' } }>('/api/v1/auth/otp/request', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-    schema: { body: { type: 'object', additionalProperties: false, required: ['phone'], properties: { phone: { type: 'string', pattern: '^\\+91[6-9][0-9]{9}$' }, context: { type: 'string', enum: ['DOCTOR'] } } } },
-  }, async request => ({ data: await service().requestOtp(request.body.phone, request.body.context === 'DOCTOR' ? 'DOCTOR_LOGIN' : 'LOGIN') }));
-  app.post<{ Body: { challengeId: string; code: string; context?: 'DOCTOR' } }>('/api/v1/auth/otp/verify', {
+    schema: { body: { type: 'object', additionalProperties: false, required: ['phone'], properties: { phone: { type: 'string', pattern: '^\\+91[6-9][0-9]{9}$' }, context: { type: 'string', enum: ['DOCTOR', 'ADMIN'] } } } },
+  }, async request => ({ data: await service().requestOtp(request.body.phone, purpose(request.body.context)) }));
+  app.post<{ Body: { challengeId: string; code: string; context?: 'DOCTOR' | 'ADMIN' } }>('/api/v1/auth/otp/verify', {
     config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: { body: { type: 'object', additionalProperties: false, required: ['challengeId', 'code'], properties: {
-      challengeId: { type: 'string', format: 'uuid' }, code: { type: 'string', pattern: '^[0-9]{6}$' }, context: { type: 'string', enum: ['DOCTOR'] },
+      challengeId: { type: 'string', format: 'uuid' }, code: { type: 'string', pattern: '^[0-9]{6}$' }, context: { type: 'string', enum: ['DOCTOR', 'ADMIN'] },
     } } },
-  }, async request => ({ data: await service().verifyOtp(request.body.challengeId, request.body.code, request.id, request.body.context === 'DOCTOR' ? 'DOCTOR_LOGIN' : 'LOGIN') }));
+  }, async request => ({ data: await service().verifyOtp(request.body.challengeId, request.body.code, request.id, purpose(request.body.context)) }));
   for (const path of ['/api/v1/auth/session', '/api/v1/users/me']) {
     app.get(path, async request => {
       const instance = service();

@@ -9,7 +9,7 @@ import { TwilioSmsProvider, type SmsOtpProvider } from './sms-provider.js';
 const invalidOtp = () => new ApiError(400, 'INVALID_OTP', 'That code is incorrect or has expired. Please try again or request a new code.');
 const unauthorized = () => new ApiError(401, 'UNAUTHENTICATED', 'Please sign in again.');
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
-type OtpPurpose = 'LOGIN' | 'DOCTOR_LOGIN' | 'DOCTOR_REGISTRATION';
+type OtpPurpose = 'LOGIN' | 'DOCTOR_LOGIN' | 'DOCTOR_REGISTRATION' | 'ADMIN_LOGIN';
 const registrationRequired = () => new ApiError(409, 'DOCTOR_REGISTRATION_REQUIRED', 'No doctor account exists yet. Choose Register as Doctor to apply.');
 const testingDenied = () => new ApiError(403, 'TEST_LOGIN_NOT_ALLOWED', 'This account is not eligible for this staging test sign-in. Use the configured synthetic account for this app.');
 
@@ -33,20 +33,30 @@ export class IdentityService implements SessionVerifier {
     try {
       const accounts = JSON.parse(this.env.OTP_TEST_ACCOUNTS) as Record<string, unknown>;
       const kind = accounts[createHash('sha256').update(phone).digest('hex')];
-      return kind === 'PATIENT' || kind === 'DOCTOR' ? kind : undefined;
+      return kind === 'PATIENT' || kind === 'DOCTOR' || kind === 'ADMIN' ? kind : undefined;
     } catch { return undefined; }
   }
 
-  private isTestingUser(user: { phone: string | null; accountStatus: string; roles: { role: string }[] }) {
+  private isTestingUser(user: { id: string; phone: string | null; accountStatus: string; roles: { role: string }[] }) {
     const kind = this.testingKind(user.phone);
+    if (kind === 'ADMIN') {
+      // Preview replaces delivery only. Existing MFA must still protect every
+      // administrative operation, with a key provisioned for this exact user.
+      if (this.env.ADMIN_SECURITY_MODE !== 'totp') return false;
+      try {
+        if (!/^[A-Z2-7]{32,128}$/.test(JSON.parse(this.env.ADMIN_TOTP_KEYS)[user.id] ?? '')) return false;
+      } catch { return false; }
+    }
     return !!kind && user.accountStatus === 'ACTIVE' && user.roles.length === 1 &&
-      user.roles[0]?.role === (kind === 'PATIENT' ? 'USER' : 'DOCTOR');
+      user.roles[0]?.role === (kind === 'PATIENT' ? 'USER' : kind);
   }
 
   private async testingEligible(db: Pick<PrismaClient, 'doctor'>, phone: string,
     user: { id: string; phone: string | null; accountStatus: string; roles: { role: string }[] } | null, purpose: OtpPurpose) {
     const kind = this.testingKind(phone);
-    if (kind !== (purpose === 'LOGIN' ? 'PATIENT' : 'DOCTOR') || (user && !this.isTestingUser(user))) return false;
+    if (kind !== (purpose === 'LOGIN' ? 'PATIENT' : purpose === 'ADMIN_LOGIN' ? 'ADMIN' : 'DOCTOR') || (user && !this.isTestingUser(user))) return false;
+    // Public OTP endpoints can never create or promote an administrator.
+    if (purpose === 'ADMIN_LOGIN') return !!user;
     if (purpose === 'LOGIN') return true;
     // An explicitly listed new Doctor identity still gets the existing
     // registration-required response; sign-in below never provisions a USER.
@@ -62,6 +72,12 @@ export class IdentityService implements SessionVerifier {
     if (this.env.OTP_MODE === 'testing') {
       const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
       if (!await this.testingEligible(this.prisma, phone, existing, purpose)) throw testingDenied();
+    }
+    if (purpose === 'ADMIN_LOGIN') {
+      const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
+      if (!existing || existing.accountStatus !== 'ACTIVE' || !existing.roles.some(r => r.role === 'ADMIN')) {
+        throw new ApiError(403, 'ADMIN_LOGIN_NOT_ALLOWED', 'An active administrator account is required.');
+      }
     }
     if (purpose === 'DOCTOR_LOGIN') {
       const existing = await this.prisma.user.findUnique({ where: { phone }, include: { roles: true } });
@@ -90,9 +106,9 @@ export class IdentityService implements SessionVerifier {
       if (old && (now.getTime() - old.requestedAt.getTime() < 60000 || (sameWindow && old.requestCount >= 5))) {
         throw new ApiError(429, 'OTP_RATE_LIMITED', 'Please wait before requesting another code. You can request up to five codes per hour.');
       }
-      // Doctor sign-in is ordinary LOGIN with a stricter account lookup, not a
+      // Doctor/Admin sign-in is ordinary LOGIN with a stricter account lookup, not a
       // new authentication purpose or database lifecycle.
-      const data = { id, purpose: purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose, codeHash: this.otpHash(id, code, purpose), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
+      const data = { id, purpose: purpose === 'DOCTOR_LOGIN' || purpose === 'ADMIN_LOGIN' ? 'LOGIN' : purpose, codeHash: this.otpHash(id, code, purpose), expiresAt: new Date(now.getTime() + 300000), requestedAt: now,
         windowStartedAt: sameWindow ? old.windowStartedAt : now,
         requestCount: sameWindow ? old.requestCount + 1 : 1, attempts: 0, consumed: this.env.OTP_MODE === 'provider' };
       await tx.otpChallenge.upsert({ where: { phone }, create: { phone, ...data }, update: data });
@@ -116,7 +132,7 @@ export class IdentityService implements SessionVerifier {
     const result = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "OtpChallenge" WHERE "id" = ${challengeId}::uuid FOR UPDATE`;
       const challenge = await tx.otpChallenge.findUnique({ where: { id: challengeId } });
-      const storedPurpose = purpose === 'DOCTOR_LOGIN' ? 'LOGIN' : purpose;
+      const storedPurpose = purpose === 'DOCTOR_LOGIN' || purpose === 'ADMIN_LOGIN' ? 'LOGIN' : purpose;
       if (!challenge || challenge.purpose !== storedPurpose || challenge.consumed || challenge.attempts >= 5 || challenge.expiresAt <= new Date()) return null;
       if (this.env.OTP_MODE === 'testing') {
         const existing = await tx.user.findUnique({ where: { phone: challenge.phone }, include: { roles: true } });
@@ -128,13 +144,14 @@ export class IdentityService implements SessionVerifier {
         return null;
       }
       await tx.otpChallenge.update({ where: { id: challengeId }, data: { consumed: true, codeHash: '0'.repeat(64) } });
-      // Doctor sign-in must never provision a Patient identity. Recheck the role
+      // Doctor/Admin sign-in must never provision a Patient identity. Recheck the role
       // after OTP verification in case the account changed since the request.
-      const user = purpose === 'DOCTOR_LOGIN'
+      const user = purpose === 'DOCTOR_LOGIN' || purpose === 'ADMIN_LOGIN'
         ? await tx.user.findUnique({ where: { phone: challenge.phone }, include: { roles: true } })
         : await tx.user.upsert({ where: { phone: challenge.phone },
         create: { phone: challenge.phone, roles: { create: { role: purpose === 'DOCTOR_REGISTRATION' ? 'DOCTOR' : 'USER' } } }, update: {}, include: { roles: true } });
       if (!user || (purpose === 'DOCTOR_LOGIN' && !user.roles.some(r => r.role === 'DOCTOR'))) return null;
+      if (purpose === 'ADMIN_LOGIN' && !user.roles.some(r => r.role === 'ADMIN')) return null;
       if (this.env.OTP_MODE === 'testing' && !this.isTestingUser(user)) return null;
       // Re-check inside the transaction: ordinary sign-in could have created USER
       // after a registration challenge was requested. Never promote that account.

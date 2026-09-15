@@ -7,6 +7,14 @@ export function validateApiBase(value: string): string {
   return url.href.replace(/\/$/, '');
 }
 export function isLoopback(host: string) { return ['localhost', '127.0.0.1', '[::1]'].includes(host); }
+export function browserApiBase(configured: string | undefined, development: boolean, devProxy: boolean, origin: string): string {
+  if (development && devProxy) {
+    const page = new URL(origin);
+    if (page.protocol !== 'http:' || !isLoopback(page.hostname)) throw new Error('Development API forwarding requires a local console.');
+    return validateApiBase(page.origin + '/api/v1');
+  }
+  return validateApiBase(configured ?? (development ? 'http://127.0.0.1:3000/api/v1' : ''));
+}
 export function isAdmin(user: { roles?: unknown }): boolean { return Array.isArray(user.roles) && user.roles.includes('ADMIN'); }
 export class StaleRequest extends Error { constructor() { super('This request belongs to an earlier session.'); } }
 export class ApiClient {
@@ -46,6 +54,8 @@ export class ApiClient {
       try { payload = await response.json(); } catch { check(); throw new Error('We could not read the response. Please try again.'); }
       check();
       if (response.status === 403 && (payload.error?.code ?? payload.code) === 'ADMIN_STEP_UP_REQUIRED') { this.stepUp(); throw new StaleRequest(); }
+      if (response.status === 403 && payload.error?.code === 'TEST_LOGIN_NOT_ALLOWED') throw new Error('This staging administrator is not configured for testing. The platform owner must configure the Admin account and authenticator.');
+      if (response.status === 403 && payload.error?.code === 'ADMIN_LOGIN_NOT_ALLOWED') throw new Error('An active administrator account is required.');
       if (!response.ok) throw new Error(response.status === 403 ? 'Your account cannot perform this action.' :
         response.status === 409 ? 'This record changed or the action is unavailable. Refresh and try again.' :
         response.status === 400 ? 'Please check the entered values and try again.' :

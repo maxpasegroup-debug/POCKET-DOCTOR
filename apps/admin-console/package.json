@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:railway": "vite --host 127.0.0.1 --mode railway-testing",
     "build": "tsc --noEmit && vite build",
     "test": "tsx --test test/*.test.ts"
   },

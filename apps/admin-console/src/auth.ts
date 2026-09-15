@@ -1,18 +1,19 @@
 import { ApiClient, isAdmin, isLoopback, StaleRequest } from './api.ts';
 import { button, el, notice } from './dom.ts';
+import { adminOtpPreview, requestAdminOtp, verifyAdminOtp, type AdminChallenge } from './auth-api.ts';
 export interface SecurityStatus { mode: 'development' | 'totp' | 'disabled'; elevated: boolean }
 export class AdminAuth {
   readonly api: ApiClient;
   private generation = 0;
   private signedIn = false;
   security: SecurityStatus | undefined;
-  constructor(private root: HTMLElement, base: string, private ready: () => void, private clearView: () => void) {
+  constructor(private root: HTMLElement, base: string, private ready: () => void, private clearView: () => void, upstreamBase = base) {
     this.api = new ApiClient(base, () => this.reset('Your session has ended. Please sign in again.'), () => {
       if (this.security?.elevated === false) return;
       this.security = this.security ? { ...this.security, elevated: false } : undefined;
       this.clearView(); void this.elevate();
     });
-    this.localDevelopment = import.meta.env.DEV && isLoopback(location.hostname) && isLoopback(new URL(base).hostname);
+    this.localDevelopment = import.meta.env.DEV && isLoopback(location.hostname) && isLoopback(new URL(upstreamBase).hostname);
   }
   private localDevelopment: boolean;
   reset(message = '') {
@@ -44,14 +45,15 @@ export class AdminAuth {
       const number = phone.value.replace(/[\s()-]/g, '');
       if (!/^\+91[6-9]\d{9}$/.test(number)) { errorBox.append(notice('Enter a valid Indian mobile number including +91.', true)); return; }
       submit.disabled = true;
-      try { const challenge = await this.api.request<{ challengeId: string; developmentCode?: string }>('/auth/otp/request', 'POST', { phone: number }); if (version === this.generation) this.otp(challenge, number); }
+      try { const challenge = await requestAdminOtp(this.api, number); if (version === this.generation) this.otp(challenge, number); }
       catch (error) { if (version === this.generation && !(error instanceof StaleRequest)) errorBox.append(notice((error as Error).message, true)); }
       finally { submit.disabled = false; }
     });
   }
-  private otp(challenge: { challengeId: string; developmentCode?: string }, phone: string) {
-    const version = this.generation, panel = this.layout('Check your phone.', `Enter the six-digit code sent to ${phone}.`);
-    if (this.localDevelopment && challenge.developmentCode) panel.append(notice(`Local development code: ${challenge.developmentCode}. No SMS was sent.`));
+  private otp(challenge: AdminChallenge, phone: string) {
+    const preview = adminOtpPreview(challenge, this.localDevelopment);
+    const version = this.generation, panel = this.layout(preview ? 'Testing verification.' : 'Check your phone.', preview ? 'Enter the displayed test code, then complete authenticator verification.' : `Enter the six-digit code sent to ${phone}.`);
+    if (preview) panel.append(notice(preview));
     const form = el('form', 'auth-form'), label = el('label', '', 'Verification code'), code = el('input'); code.id = 'admin-otp'; label.htmlFor = code.id;
     code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.pattern = '[0-9]{6}'; code.maxLength = 6; code.required = true;
     const errorBox = el('div'), submit = el('button', 'button primary', 'Verify and continue'); submit.type = 'submit';
@@ -59,7 +61,7 @@ export class AdminAuth {
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (submit.disabled) return; submit.disabled = true; errorBox.replaceChildren();
       try {
-        const result = await this.api.request<{ token: string; user: { roles: string[] } }>('/auth/otp/verify', 'POST', { challengeId: challenge.challengeId, code: code.value.trim() });
+        const result = await verifyAdminOtp(this.api, challenge.challengeId, code.value.trim());
         if (version !== this.generation) return;
         this.api.setToken(result.token);
         if (!isAdmin(result.user)) { await this.api.logout().catch(() => {}); this.reset('An administrator account is required to use this workspace.'); return; }

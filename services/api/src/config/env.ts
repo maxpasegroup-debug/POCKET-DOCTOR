@@ -63,10 +63,11 @@ const schema = z.object({
 }).superRefine((env, ctx) => {
   const deployed = env.APP_ENV === 'staging' || env.APP_ENV === 'production';
   try {
-    const accounts = z.record(z.string().regex(/^[a-f0-9]{64}$/), z.enum(['PATIENT', 'DOCTOR']))
+    const accounts = z.record(z.string().regex(/^[a-f0-9]{64}$/), z.enum(['PATIENT', 'DOCTOR', 'ADMIN']))
       .parse(JSON.parse(env.OTP_TEST_ACCOUNTS));
     if (Object.keys(accounts).length > 50 || (Object.keys(accounts).length > 0 &&
       (env.OTP_MODE !== 'testing' || !['staging', 'test'].includes(env.APP_ENV)))) throw new Error();
+    if (Object.values(accounts).includes('ADMIN') && env.ADMIN_SECURITY_MODE !== 'totp') throw new Error();
   } catch {
     ctx.addIssue({ code: 'custom', path: ['OTP_TEST_ACCOUNTS'],
       message: 'Configure at most 50 explicit synthetic identities for hosted testing only' });

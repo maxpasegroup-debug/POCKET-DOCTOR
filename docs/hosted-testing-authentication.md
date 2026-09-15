@@ -16,7 +16,7 @@ Keep `APP_ENV=staging`, `NODE_ENV=production`, and `OTP_MODE=testing`. Add the p
 {"<SHA-256 of normalized synthetic Patient phone>":"PATIENT","<SHA-256 of normalized synthetic Doctor phone>":"DOCTOR"}
 ```
 
-Replace the placeholders with lowercase 64-character SHA-256 hashes of exact normalized `+91` phone identifiers, with no spaces. The map accepts at most 50 entries. One identifier belongs to one test client category. Empty/default `{}` rejects every testing login. Invalid JSON, unsupported categories (including ADMIN), malformed hashes, and maps enabled outside staging/test or outside testing OTP mode fail startup.
+Replace the placeholders with lowercase 64-character SHA-256 hashes of exact normalized `+91` phone identifiers, with no spaces. The map accepts at most 50 entries. One identifier belongs to one test client category. Empty/default `{}` rejects every testing login. Invalid JSON, unsupported categories, malformed hashes, and maps enabled outside staging/test or outside testing OTP mode fail startup. The additional `ADMIN` category requires TOTP and an existing, explicitly provisioned Admin identity; see [staging Admin setup](staging-admin-testing.md).
 
 Keep the map and the test identifiers private. Do not put them in Flutter configuration, source control, screenshots, or logs. No fixed phone number, universal OTP, or shared test password is supplied in this repository.
 
@@ -60,11 +60,11 @@ Credential policy, storage, ownership and review are unchanged. Real credential 
 
 Only existing authorized Admin review can approve an application. Approval is verified again before Doctor sign-in and operational access. Sessions restore through `/api/v1/doctor/session`; a verified complete profile returns READY. Doctor-only and Admin API authorization remains server controlled.
 
-## Admin limitation
+## Staging Admin access
 
-This change deliberately does not add Admin preview authentication. With `OTP_MODE=testing`, Admin identities cannot obtain testing sessions. `ADMIN_SECURITY_MODE=disabled` also disables administration. Simply setting TOTP mode does not solve the missing first-factor Admin session.
+The Admin console now uses `context: ADMIN` with the existing OTP request and verification routes. An Admin registry entry requires `ADMIN_SECURITY_MODE=totp`, a key in `ADMIN_TOTP_KEYS` for the exact user ID, an active account, and exclusively the server-assigned ADMIN role. Public login cannot create or promote an Admin. The displayed testing code only creates an unelevated session: existing authenticator verification still gates all Admin operations. Production rejects testing OTP and the test registry.
 
-Consequently, an already approved synthetic Doctor can test Doctor sign-in after deployment/configuration, but a new hosted application cannot complete Admin approval until an authorized operational Admin access path is available. Do not manually promote the application in SQL or disable authorization to work around this. The automated registration/approval regression uses the existing local Admin development authentication on an isolated local test database, not a hosted Admin bypass. Hosted end-to-end approval remains unverified.
+Follow [staging Admin setup](staging-admin-testing.md) for operator provisioning. Do not promote Doctor applications in SQL or disable authorization. Existing registration/approval regression uses the local Admin development mechanism; the additional staging Admin regression tests the real TOTP gate on isolated PostgreSQL. Hosted end-to-end approval remains unverified until the corresponding Railway setup and actual login are completed.
 
 ## App configuration and testing
 
