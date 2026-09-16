@@ -5,6 +5,8 @@ import Fastify, { LogController } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import websocket from '@fastify/websocket';
+import { registerPatientRealtime } from './modules/realtime/routes.js';
 import type { Environment } from './config/env.js';
 import type { Database } from './database/database.js';
 import { ApiError } from './errors/api-error.js';
@@ -35,7 +37,7 @@ export async function buildApp(env: Environment, database?: Database, registrati
     logController: new LogController({ disableRequestLogging: true }),
     logger: env.APP_ENV === 'test' ? false : {
       level: env.LOG_LEVEL,
-      redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', 'password', 'token', 'phone', 'healthData'],
+      redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["sec-websocket-protocol"]', 'res.headers.set-cookie', 'password', 'token', 'phone', 'healthData'],
     },
   });
 
@@ -46,6 +48,8 @@ export async function buildApp(env: Environment, database?: Database, registrati
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(websocket, { options: { maxPayload: 1024, perMessageDeflate: false,
+    handleProtocols: protocols => protocols.has('pocket-doctor.v1') ? 'pocket-doctor.v1' : false } });
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
@@ -87,10 +91,11 @@ export async function buildApp(env: Environment, database?: Database, registrati
   registerPushRoutes(app, env, database?.client);
   registerPaymentWebhook(app, env, database?.client);
   registerIdentityRoutes(app, env, database?.client);
-  registerDoctorRegistrationRoutes(app, env, database?.client, registration);
+  const patientEvents = registerPatientRealtime(app, env, database?.client);
+  registerDoctorRegistrationRoutes(app, env, database?.client, registration, patientEvents);
   registerDoctorSessionRoutes(app, env, database?.client);
   registerProgramRoutes(app, env, database?.client);
-  registerConsultationRoutes(app, env, database?.client);
+  registerConsultationRoutes(app, env, database?.client, patientEvents);
   registerCommerceRoutes(app, env, database?.client);
   registerAssistantRoutes(app, env, database?.client);
   registerMembershipRoutes(app, env, database?.client);

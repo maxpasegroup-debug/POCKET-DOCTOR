@@ -9,9 +9,10 @@ import { adminActor } from '../admin/security.js';
 import { parse } from '../admin/contracts.js';
 import { RegistrationService } from './service.js';
 import { draftInput, uploadInput, type RegistrationDependencies } from './contracts.js';
-export function registerDoctorRegistrationRoutes(app: FastifyInstance, env: Environment, db?: PrismaClient, dependencies: RegistrationDependencies = {}) {
+import { noPatientEvents, type PatientEventPublisher } from '../realtime/events.js';
+export function registerDoctorRegistrationRoutes(app: FastifyInstance, env: Environment, db?: PrismaClient, dependencies: RegistrationDependencies = {}, events: PatientEventPublisher = noPatientEvents) {
   const identity = db ? new IdentityService(db,env) : undefined;
-  const service = db ? new RegistrationService(db,dependencies) : undefined;
+  const service = db ? new RegistrationService(db,dependencies,events) : undefined;
   function ready() { if (!identity || !service) throw new ApiError(503,'SERVICE_UNAVAILABLE','Registration is temporarily unavailable.'); return {identity,service}; }
   async function owner(r: FastifyRequest) { const s=ready(); const actor=await authenticate(r,s.identity); authorize(actor,['DOCTOR']); return { ...s, actor }; }
   const base='/api/v1/doctor/registration';

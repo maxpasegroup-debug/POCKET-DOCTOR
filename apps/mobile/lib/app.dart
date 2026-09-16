@@ -5,6 +5,8 @@ import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/application/auth_controller.dart';
 import 'features/auth/presentation/splash_screen.dart';
+import 'features/realtime/realtime_notice.dart';
+import 'features/realtime/realtime_providers.dart';
 
 class PocketDoctorApp extends ConsumerStatefulWidget {
   const PocketDoctorApp({super.key});
@@ -40,6 +42,10 @@ class _PocketDoctorAppState extends ConsumerState<PocketDoctorApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(authProvider.notifier).revalidateSession();
+      ref.read(patientRealtimeSessionProvider)?.connection.resume();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      ref.read(patientRealtimeSessionProvider)?.connection.pause();
     }
   }
 
@@ -51,7 +57,8 @@ class _PocketDoctorAppState extends ConsumerState<PocketDoctorApp>
     routerConfig: ref.watch(appRouterProvider),
     // Session initialization continues through SplashScreen's auth provider.
     // Once this one-time display period ends, the router still waits for auth.
-    builder: (context, child) =>
-        _showStartupSplash ? const SplashScreen() : child!,
+    builder: (context, child) => _showStartupSplash
+        ? const SplashScreen()
+        : PatientRealtimeNotice(child: child!),
   );
 }

@@ -5,6 +5,7 @@ import { ApiError } from '../../errors/api-error.js';
 import { DevelopmentPaymentProvider, receiptMatches } from '../programs/payment-provider.js';
 import { generateSlots, type AvailabilityInput } from './availability.js';
 import { UnavailableConsultationProvider, type ConsultationSessionProvider } from './session-provider.js';
+import { noPatientEvents, publiclyAvailable, type PatientEventPublisher } from '../realtime/events.js';
 
 type Tx = Prisma.TransactionClient;
 const missing = () => new ApiError(404, 'NOT_FOUND', 'This consultation or doctor is not available.');
@@ -25,7 +26,7 @@ export class ConsultationService {
   // Aggregate counters only: no actor IDs, specialty, query text or record content.
   readonly events = new Map<string, number>();
   constructor(private db: PrismaClient, private env: Environment,
-    private sessions: ConsultationSessionProvider = new UnavailableConsultationProvider()) {}
+    private sessions: ConsultationSessionProvider = new UnavailableConsultationProvider(), private patientEvents: PatientEventPublisher = noPatientEvents) {}
   async sessionAccess(userId: string, id: string, role: 'patient' | 'doctor') {
     const doctor = role === 'doctor' ? await this.assignedDoctor(userId) : null;
     const appointment = await this.db.consultation.findFirst({ where: { id, ...(doctor ? { doctorId: doctor.id } : { userId }) }, include: { payments: true } });
@@ -73,6 +74,7 @@ export class ConsultationService {
     await this.lock(tx, doctorId);
     const doctor = await tx.doctor.findFirst({ where: { id: doctorId, userId, verificationStatus: 'VERIFIED' } });
     if (!doctor || (doctor.isDemo && this.env.DEMO_CONSULTATIONS !== 'true')) throw new ApiError(403, 'FORBIDDEN', 'A verified doctor account is required.');
+    return doctor;
   }
   private async available(id: string, date: string, tx: Tx = this.db, excludeId?: string) {
     const day = Date.parse(`${date}T00:00:00Z`);
@@ -226,15 +228,17 @@ export class ConsultationService {
   }
   async updateAvailability(userId: string, input: AvailabilityInput) {
     const d = await this.assignedDoctor(userId);
-    await this.db.$transaction(async tx => {
-      await this.lockAssigned(tx, d.id, userId);
+    const becameAvailable = await this.db.$transaction(async tx => {
+      const previous = await this.lockAssigned(tx, d.id, userId);
       const { windows, excludedDates, ...settings } = input;
-      await tx.doctor.update({ where: { id: d.id }, data: settings });
+      const updated = await tx.doctor.update({ where: { id: d.id }, data: settings });
       await tx.doctorAvailability.deleteMany({ where: { doctorId: d.id } });
       await tx.doctorAvailabilityException.deleteMany({ where: { doctorId: d.id } });
       await tx.doctorAvailability.createMany({ data: windows.map(w => ({ ...w, doctorId: d.id })) });
       await tx.doctorAvailabilityException.createMany({ data: [...new Set(excludedDates)].map(localDate => ({ doctorId: d.id, localDate })) });
+      return !publiclyAvailable(previous) && publiclyAvailable(updated);
     });
+    if (becameAvailable) await this.patientEvents.doctorAvailable(d.id).catch(() => {});
     return this.availability(userId);
   }
   async profile(userId: string, input?: { biography: string; languages: string[] }) {

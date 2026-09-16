@@ -3,6 +3,7 @@ import type { PrismaClient, Doctor, Prisma } from '../../generated/prisma/client
 import type { z } from 'zod';
 import { ApiError } from '../../errors/api-error.js';
 import { draftInput, documentBytes, maxDocumentBytes, type RegistrationDependencies, type uploadInput } from './contracts.js';
+import { noPatientEvents, publiclyAvailable, type PatientEventPublisher } from '../realtime/events.js';
 type Tx = Prisma.TransactionClient;
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'Application or document not found.');
 export function registrationStatus(d: Doctor) {
@@ -10,7 +11,7 @@ export function registrationStatus(d: Doctor) {
   return d.registrationReviewStartedAt ? 'UNDER_REVIEW' : d.registrationSubmittedAt ? 'SUBMITTED' : 'DRAFT';
 }
 export class RegistrationService {
-  constructor(private db: PrismaClient, private dependencies: RegistrationDependencies = {}) {}
+  constructor(private db: PrismaClient, private dependencies: RegistrationDependencies = {}, private events: PatientEventPublisher = noPatientEvents) {}
   private storage() {
     if (!this.dependencies.store?.available) throw new ApiError(503, 'PRIVATE_STORAGE_UNAVAILABLE', 'Secure document storage is not configured. Your draft is safe; please try again later.');
     return this.dependencies.store;
@@ -105,8 +106,9 @@ export class RegistrationService {
     }); return this.view(userId);
   }
   async review(id: string, action: 'BEGIN_REVIEW'|'APPROVE'|'REJECT'|'SUSPEND', reason: string, actorId: string, requestId: string) {
-    await this.db.$transaction(async tx => {
+    const becameAvailable = await this.db.$transaction(async tx => {
       const d = await this.lock(id, tx); const status = registrationStatus(d);
+      let becameAvailable = false;
       if (action === 'SUSPEND') {
         if (status !== 'VERIFIED') throw new ApiError(409,'INVALID_STATE','Only a verified doctor can be suspended.');
         await tx.doctor.update({ where:{id}, data:{verificationStatus:'SUSPENDED', acceptingAppointments:false} });
@@ -114,13 +116,18 @@ export class RegistrationService {
         if (!['SUBMITTED','UNDER_REVIEW'].includes(status)) throw new ApiError(409,'INVALID_STATE','Only a submitted application can be reviewed.');
         if (action === 'APPROVE') {
           await this.complete(d,tx);
-          await tx.doctor.update({where:{id},data:{verificationStatus:'VERIFIED',verifiedAt:new Date(),registrationReviewedAt:new Date(),registrationRejectionReason:null}});
+          const updated = await tx.doctor.update({where:{id},data:{verificationStatus:'VERIFIED',verifiedAt:new Date(),registrationReviewedAt:new Date(),registrationRejectionReason:null}});
+          becameAvailable = !publiclyAvailable(d) && publiclyAvailable(updated);
         } else if (action === 'REJECT') {
           if (!reason.trim()) throw new ApiError(400,'REASON_REQUIRED','Provide a correction reason.');
           await tx.doctor.update({where:{id},data:{verificationStatus:'REJECTED',registrationReviewedAt:new Date(),registrationRejectionReason:reason.trim(),acceptingAppointments:false,verifiedAt:null}});
         } else await tx.doctor.update({where:{id},data:{registrationReviewStartedAt:new Date()}});
       }
       await tx.adminAuditEvent.create({data:{actorId,action:`DOCTOR_APPLICATION_${action}`,resourceId:id,requestId,result:'SUCCEEDED'}});
-    }); return this.adminView(id);
+      return becameAvailable;
+    });
+    // Ephemeral notification only after commit; a delivery failure cannot undo approval.
+    if (becameAvailable) await this.events.doctorAvailable(id).catch(() => {});
+    return this.adminView(id);
   }
 }

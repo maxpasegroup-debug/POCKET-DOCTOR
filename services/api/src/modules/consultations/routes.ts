@@ -8,6 +8,7 @@ import { IdentityService } from '../auth/identity-service.js';
 import { authenticateDoctor } from '../auth/doctor-session.js';
 import { ConsultationService } from './consultation-service.js';
 import { availabilityInput, localDate } from './availability.js';
+import { noPatientEvents, type PatientEventPublisher } from '../realtime/events.js';
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
@@ -16,8 +17,8 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 }
 const idSchema = z.object({ id: z.string().uuid() });
 const slotSchema = z.object({ date: localDate, startsAt: z.iso.datetime({ offset: true }) }).strict();
-export function registerConsultationRoutes(app: FastifyInstance, env: Environment, db?: PrismaClient) {
-  const service = db ? new ConsultationService(db, env) : undefined;
+export function registerConsultationRoutes(app: FastifyInstance, env: Environment, db?: PrismaClient, events: PatientEventPublisher = noPatientEvents) {
+  const service = db ? new ConsultationService(db, env, undefined, events) : undefined;
   const identity = db ? new IdentityService(db, env) : undefined;
   async function context(request: FastifyRequest, doctor = false) {
     if (!service || !identity) throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'Consultations are unavailable right now.');
