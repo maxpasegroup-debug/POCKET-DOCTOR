@@ -36,6 +36,27 @@ test('doctor registration, approval, rejection, ownership and suspension on Post
   const profile={name:'SYNTHETIC registration doctor',registrationEmail:'doctor@example.invalid',registrationDateOfBirth:'1990-01-01',registrationGender:'PREFER_NOT_TO_SAY' as const,qualification:'SYNTHETIC qualification',specialty:'SYNTHETIC education',biography:'Synthetic professional application used only for tests.',registrationAuthority:'SYNTHETIC council',registrationNumber:'SYNTHETIC-123',experienceYears:4,languages:['English'],feePaise:10000};
   const doc={kind:'REGISTRATION',fileName:'synthetic.pdf',contentType:'application/pdf',contentBase64:Buffer.from('%PDF-1.7 synthetic contract-test bytes').toString('base64')};
   let documentId='';
+  async function assertAdminCannotEdit(doctorId:string) {
+    const before=await db.doctor.findUniqueOrThrow({where:{id:doctorId},include:{availability:true,exceptions:true,credentials:true}});
+    const path=`/admin/operations/doctors/${doctorId}`;
+    const payload={name:'Unauthorized admin rewrite',qualification:'Changed qualification',specialty:'Changed specialty',biography:'Changed biography',experienceYears:1,languages:['Hindi'],feePaise:1,acceptingAppointments:true,verificationStatus:before.verificationStatus,registrationAuthority:'Changed council',registrationNumber:'Changed registration'};
+    for(const [method,url,body] of [['PATCH',path,payload],['PATCH',path,{...payload,verificationStatus:'VERIFIED'}],['POST',path+'/availability',{timezone:'Asia/Kolkata',consultationMinutes:20,bufferMinutes:5,acceptingAppointments:false,windows:[],excludedDates:[]}]] as const){
+      const response=await call(url,method,body,admin.token);
+      assert.equal(response.statusCode,403);assert.equal(response.json().error.code,'DOCTOR_DETAILS_READ_ONLY');
+    }
+    assert.deepEqual(await db.doctor.findUniqueOrThrow({where:{id:doctorId},include:{availability:true,exceptions:true,credentials:true}}),before);
+    assert.equal((await call(path,'GET',undefined,admin.token)).statusCode,200);
+  }
+  await t.test('Admin can read but cannot rewrite a new Doctor draft or schedule',async()=>{
+    await assertAdminCannotEdit(a.id);
+    for(const token of [patient.token,a.token])assert.equal((await call(`/admin/operations/doctors/${a.id}`,'PATCH',{name:'Changed'},token)).statusCode,403);
+    assert.equal((await call(`/admin/operations/doctors/${a.id}`,'PATCH',{name:'Changed'})).statusCode,401);
+  });
+  await t.test('legacy Doctor profiles without registration dates are also read-only for Admin',async()=>{
+    const legacy=await register();
+    await db.doctor.update({where:{id:legacy.id},data:{registrationStartedAt:null}});
+    await assertAdminCannotEdit(legacy.id);
+  });
   await t.test('development document deferral still requires complete profile and Admin approval',async()=>{
     const deferredEnv=readEnvironment({APP_ENV:'test',OTP_MODE:'development',SESSION_SECRET:env.SESSION_SECRET,ADMIN_SECURITY_MODE:'development',DOCTOR_REGISTRATION_DEFER_DOCUMENTS:'true'});
     const deferred=await buildApp(deferredEnv,createDatabase(process.env.DATABASE_URL!),configuredRegistration(deferredEnv));
@@ -101,18 +122,22 @@ test('doctor registration, approval, rejection, ownership and suspension on Post
   });
   await t.test('submit locks draft and does not grant operational access; Admin review/rejection',async()=>{
     const submit=await call('/doctor/registration/submit','POST',{},a.token);assert.equal(submit.statusCode,200);assert.equal(submit.json().data.status,'SUBMITTED');
+    await assertAdminCannotEdit(a.id);
     assert.equal((await call('/doctor/registration','PATCH',profile,a.token)).statusCode,409);
     assert.equal((await call('/doctor/appointments','GET',undefined,a.token)).statusCode,403);
     assert.equal((await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'APPROVE'},a.token)).statusCode,403);
     assert.equal((await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'BEGIN_REVIEW'},admin.token)).json().data.status,'UNDER_REVIEW');
+    await assertAdminCannotEdit(a.id);
     assert.equal((await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'REJECT'},admin.token)).statusCode,400);
     const rejected=await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'REJECT',reason:'Replace the synthetic registration certificate.'},admin.token);assert.equal(rejected.statusCode,200);assert.equal(rejected.json().data.status,'REJECTED');
+    await assertAdminCannotEdit(a.id);
     assert.equal((await call('/doctor/appointments','GET',undefined,a.token)).statusCode,403);
   });
   await t.test('correction/resubmission then approval grants existing Doctor services',async()=>{
     assert.equal((await call('/doctor/registration','PATCH',{...profile,qualification:'Corrected synthetic qualification'},a.token)).statusCode,200);
     assert.equal((await call('/doctor/registration/submit','POST',{},a.token)).statusCode,200);
     const approved=await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'APPROVE'},admin.token);assert.equal(approved.statusCode,200);assert.equal(approved.json().data.status,'VERIFIED');
+    await assertAdminCannotEdit(a.id);
     const session=await call('/doctor/session','GET',undefined,a.token);assert.equal(session.json().data.status,'READY');
     assert.equal((await call('/doctor/appointments','GET',undefined,a.token)).statusCode,200);
     assert.equal((await call('/doctor/registration','PATCH',profile,a.token)).statusCode,409);
@@ -120,12 +145,14 @@ test('doctor registration, approval, rejection, ownership and suspension on Post
   });
   await t.test('suspension denies the existing session on the next operational request',async()=>{
     assert.equal((await call(`/admin/operations/doctors/${a.id}/registration/review`,'POST',{action:'SUSPEND'},admin.token)).statusCode,200);
+    await assertAdminCannotEdit(a.id);
     assert.equal((await call('/doctor/appointments','GET',undefined,a.token)).statusCode,403);
     assert.equal((await call(`/doctor/registration/documents/${documentId}`,'GET',undefined,a.token)).statusCode,403);
   });
   await t.test('legacy Admin PATCH cannot bypass application approval or rejection rules',async()=>{
     const payload={name:profile.name,qualification:profile.qualification,specialty:profile.specialty,biography:profile.biography,experienceYears:4,languages:['English'],feePaise:10000,acceptingAppointments:true,verificationStatus:'VERIFIED',registrationAuthority:profile.registrationAuthority,registrationNumber:profile.registrationNumber};
-    assert.equal((await call(`/admin/operations/doctors/${b.id}`,'PATCH',payload,admin.token)).statusCode,409);
+    const response=await call(`/admin/operations/doctors/${b.id}`,'PATCH',payload,admin.token);
+    assert.equal(response.statusCode,403);assert.equal(response.json().error.code,'DOCTOR_DETAILS_READ_ONLY');
   });
   await t.test('unconfigured private storage fails closed without metadata or privilege grant',async()=>{
     const {RegistrationService}=await import('../src/modules/doctor-registration/service.js');const svc=new RegistrationService(db);

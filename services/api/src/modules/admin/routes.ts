@@ -4,11 +4,10 @@ import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { Environment } from '../../config/env.js';
 import { ApiError } from '../../errors/api-error.js';
 import { adminActor } from './security.js';
-import { parse, pagination, doctorInput, programInput, moduleInput, lessonInput, liveInput } from './contracts.js';
+import { parse, pagination, programInput, moduleInput, lessonInput, liveInput } from './contracts.js';
 import { dashboard, readiness, listOperations, operationDetail, programDto, orderSelect, appointmentSelect, subscriptionSelect } from './queries.js';
 import { CommerceService } from '../wellness/commerce-service.js';
 import { ConsultationService } from '../consultations/consultation-service.js';
-import { availabilityInput } from '../consultations/availability.js';
 import { RefundService } from '../payments/refunds.js';
 
 export function registerAdminRoutes(app: FastifyInstance, env: Environment, db?: PrismaClient) {
@@ -48,27 +47,12 @@ export function registerAdminRoutes(app: FastifyInstance, env: Environment, db?:
     }); return { data: { saved: true } };
   });
   app.patch('/api/v1/admin/operations/doctors/:id', async r => {
-    const db = database(r), { id } = params(r), input = parse(doctorInput, r.body);
-    const item = await db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT "id" FROM "Doctor" WHERE "id" = ${id}::uuid FOR UPDATE`;
-      const previous = await tx.doctor.findUnique({ where: { id } }); if (!previous) throw new ApiError(404, 'NOT_FOUND', 'Doctor not found.');
-      if (previous.registrationStartedAt && input.verificationStatus !== previous.verificationStatus) throw new ApiError(409, 'APPLICATION_REVIEW_REQUIRED', 'Use the application review controls for this doctor.');
-      return tx.doctor.update({ where: { id }, data: { ...input, acceptingAppointments: input.acceptingAppointments && input.verificationStatus === 'VERIFIED',
-        verifiedAt: input.verificationStatus === 'VERIFIED' && !previous.isDemo ? previous.verifiedAt ?? new Date() : null } });
-    }); return { data: { item } };
+    database(r); params(r);
+    throw new ApiError(403, 'DOCTOR_DETAILS_READ_ONLY', 'Doctor details are read-only for administrators. Use application review to request corrections.');
   });
   app.post('/api/v1/admin/operations/doctors/:id/availability', async r => {
-    const db = database(r), { id } = params(r), input = parse(availabilityInput, r.body);
-    await db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT "id" FROM "Doctor" WHERE "id" = ${id}::uuid FOR UPDATE`;
-      const doctor = await tx.doctor.findUnique({ where: { id } }); if (!doctor) throw new ApiError(404, 'NOT_FOUND', 'Doctor not found.');
-      if (input.acceptingAppointments && doctor.verificationStatus !== 'VERIFIED') throw new ApiError(409, 'VERIFICATION_REQUIRED', 'Verify this doctor before opening appointments.');
-      const { windows, excludedDates, ...settings } = input;
-      await tx.doctor.update({ where: { id }, data: settings });
-      await tx.doctorAvailability.deleteMany({ where: { doctorId: id } }); await tx.doctorAvailabilityException.deleteMany({ where: { doctorId: id } });
-      await tx.doctorAvailability.createMany({ data: windows.map(w => ({ ...w, doctorId: id })) });
-      await tx.doctorAvailabilityException.createMany({ data: [...new Set(excludedDates)].map(localDate => ({ doctorId: id, localDate })) });
-    }); return { data: { saved: true } };
+    database(r); params(r);
+    throw new ApiError(403, 'DOCTOR_DETAILS_READ_ONLY', 'Doctor availability is read-only for administrators. The doctor manages their schedule.');
   });
   app.post('/api/v1/admin/operations/categories', async r => {
     const db = database(r), input = parse(z.object({ id: z.string().regex(/^[a-z0-9-]{1,60}$/), name: z.string().trim().min(1).max(100), interest: z.string().max(100).nullable(), position: z.number().int().min(0).max(1000) }).strict(), r.body);

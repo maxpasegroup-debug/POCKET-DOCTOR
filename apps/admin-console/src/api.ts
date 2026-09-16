@@ -56,6 +56,9 @@ export class ApiClient {
       if (response.status === 403 && (payload.error?.code ?? payload.code) === 'ADMIN_STEP_UP_REQUIRED') { this.stepUp(); throw new StaleRequest(); }
       if (response.status === 403 && payload.error?.code === 'TEST_LOGIN_NOT_ALLOWED') throw new Error('This staging administrator is not configured for testing. The platform owner must configure the Admin account and authenticator.');
       if (response.status === 403 && payload.error?.code === 'ADMIN_LOGIN_NOT_ALLOWED') throw new Error('An active administrator account is required.');
+      if (payload.error?.code === 'LOCAL_TEST_SESSION_REQUIRED') throw new Error('Please sign out and sign in again through this local testing console.');
+      if (payload.error?.code === 'DOCTOR_DETAILS_READ_ONLY') throw new Error('Doctor details are read-only for Admin. Use application review to request corrections.');
+      if (payload.error?.code === 'LOCAL_TEST_CHECK_FAILED') throw new Error('The automatic testing check was not accepted. Wait 30 seconds and try again. If it persists, check the private setup matches Railway.');
       if (!response.ok) throw new Error(response.status === 403 ? 'Your account cannot perform this action.' :
         response.status === 409 ? 'This record changed or the action is unavailable. Refresh and try again.' :
         response.status === 400 ? 'Please check the entered values and try again.' :

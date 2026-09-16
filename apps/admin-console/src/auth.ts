@@ -16,6 +16,7 @@ export class AdminAuth {
     this.localDevelopment = import.meta.env.DEV && isLoopback(location.hostname) && isLoopback(new URL(upstreamBase).hostname);
   }
   private localDevelopment: boolean;
+  private automaticCheck = import.meta.env.DEV && import.meta.env.VITE_LOCAL_ADMIN_AUTO_CHECK === true;
   reset(message = '') {
     this.generation++; this.signedIn = false; this.security = undefined; this.api.clear(); this.clearView();
     for (const dialog of document.querySelectorAll('dialog')) dialog.remove(); this.login(message);
@@ -51,8 +52,8 @@ export class AdminAuth {
     });
   }
   private otp(challenge: AdminChallenge, phone: string) {
-    const preview = adminOtpPreview(challenge, this.localDevelopment);
-    const version = this.generation, panel = this.layout(preview ? 'Testing verification.' : 'Check your phone.', preview ? 'Enter the displayed test code, then complete authenticator verification.' : `Enter the six-digit code sent to ${phone}.`);
+    const preview = adminOtpPreview(challenge, this.localDevelopment, this.automaticCheck);
+    const version = this.generation, panel = this.layout(preview ? 'Testing verification.' : 'Check your phone.', preview ? (this.automaticCheck ? 'Enter the displayed test code to continue.' : 'Enter the displayed test code, then complete authenticator verification.') : `Enter the six-digit code sent to ${phone}.`);
     if (preview) panel.append(notice(preview));
     const form = el('form', 'auth-form'), label = el('label', '', 'Verification code'), code = el('input'); code.id = 'admin-otp'; label.htmlFor = code.id;
     code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.pattern = '[0-9]{6}'; code.maxLength = 6; code.required = true;
@@ -71,7 +72,7 @@ export class AdminAuth {
     }); code.focus();
   }
   async elevate() {
-    const version = this.generation, panel = this.layout('One more security check.', 'Administrative access requires a current security verification.');
+    const version = this.generation, panel = this.layout(this.automaticCheck ? 'Opening your workspace.' : 'One more security check.', this.automaticCheck ? 'Completing your testing sign-in.' : 'Administrative access requires a current security verification.');
     const status = el('div', '', notice('Checking security settings…')); panel.append(status);
     try {
       const security = await this.api.request<SecurityStatus>('/admin/session/status'); if (version !== this.generation) return;
@@ -79,6 +80,12 @@ export class AdminAuth {
       if (security.elevated) { this.ready(); return; }
       status.replaceChildren();
       if (security.mode === 'disabled') { status.append(notice('Administrator security is not configured. Contact the platform owner.', true), button('Sign out', () => this.logout())); return; }
+      if (this.automaticCheck && security.mode === 'totp') {
+        status.append(notice('Opening your Admin workspace…'));
+        await this.api.request('/_local/admin/elevate', 'POST', {});
+        if (version === this.generation) { this.security = { ...security, elevated: true }; this.ready(); }
+        return;
+      }
       const local = security.mode === 'development';
       if (local) status.append(notice('Local security mode. This development-only check cannot authorize a production console.'));
       const form = el('form', 'auth-form'), code = el('input'); code.id = 'admin-totp'; code.inputMode = 'numeric'; code.autocomplete = 'one-time-code'; code.pattern = '[0-9]{6}'; code.maxLength = 6; code.required = !local;

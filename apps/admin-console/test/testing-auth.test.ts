@@ -28,3 +28,9 @@ test('staging eligibility and genuine authorization errors have distinct safe me
     await assert.rejects(requestAdminOtp(api, 'synthetic-placeholder'), expected);
   }
 });
+
+test('old Doctor edit requests explain the read-only restriction without hiding it', async () => {
+  const api = new ApiClient('https://api.example.invalid/api/v1', () => {}, () => {}, async () =>
+    Response.json({ error: { code: 'DOCTOR_DETAILS_READ_ONLY' } }, { status: 403 }));
+  await assert.rejects(api.request('/admin/operations/doctors/example', 'PATCH', { name: 'Changed' }), /read-only for Admin.*request corrections/);
+});

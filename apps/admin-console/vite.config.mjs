@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig, loadEnv } from 'vite';
+import { createLocalAdminAuth, loadLocalAdminSetup } from './local-admin-auth.mjs';
 
 // Only the loopback Vite development server forwards requests. Production
 // builds continue to call the configured HTTPS API and use its CORS policy.
-export function adminDevelopmentConfig({ command, isPreview = false, apiBase }) {
-  const inactive = { define: { 'import.meta.env.VITE_DEV_API_PROXY': 'false' } };
+export function adminDevelopmentConfig({ command, isPreview = false, apiBase, localAdminSetup }) {
+  const inactive = { define: { 'import.meta.env.VITE_DEV_API_PROXY': 'false', 'import.meta.env.VITE_LOCAL_ADMIN_AUTO_CHECK': 'false' } };
   if (command !== 'serve' || isPreview || !apiBase) return inactive;
   const target = new URL(apiBase);
   if (target.protocol !== 'https:') return inactive;
@@ -12,9 +13,10 @@ export function adminDevelopmentConfig({ command, isPreview = false, apiBase }) 
     throw new Error('Admin development forwarding requires an HTTPS API base ending in /api/v1.');
   }
   return {
-    define: { 'import.meta.env.VITE_DEV_API_PROXY': 'true' },
+    define: { 'import.meta.env.VITE_DEV_API_PROXY': 'true', 'import.meta.env.VITE_LOCAL_ADMIN_AUTO_CHECK': localAdminSetup ? 'true' : 'false' },
     server: {
       host: '127.0.0.1',
+      fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/artifacts/**'] },
       proxy: {
         '^/api/v1(?:/|$)': {
           target: target.origin, changeOrigin: true, secure: true,
@@ -43,6 +45,7 @@ export function adminDevelopmentConfig({ command, isPreview = false, apiBase }) 
           }
           next();
         });
+        if (localAdminSetup) server.middlewares.use(createLocalAdminAuth({ apiBase, setup: localAdminSetup }).middleware);
       },
     }],
   };
@@ -54,6 +57,8 @@ export default defineConfig(({ command, mode, isPreview }) => {
     ? JSON.parse(readFileSync(new URL('./config/railway-testing.json', import.meta.url), 'utf8')).apiBaseUrl
     : undefined;
   const apiBase = process.env.VITE_API_BASE_URL ?? env.VITE_API_BASE_URL ?? hosted;
-  const config = adminDevelopmentConfig({ command, isPreview, apiBase });
+  const localAdminSetup = command === 'serve' && !isPreview && mode === 'railway-testing' && apiBase === hosted
+    ? loadLocalAdminSetup(new URL('../../artifacts/staging-admin-private-setup.json', import.meta.url)) : undefined;
+  const config = adminDevelopmentConfig({ command, isPreview, apiBase, localAdminSetup });
   return { ...config, define: { ...config.define, ...(apiBase ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(apiBase) } : {}) } };
 });

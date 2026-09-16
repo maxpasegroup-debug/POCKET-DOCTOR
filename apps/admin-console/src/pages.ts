@@ -3,7 +3,6 @@ import { ApiClient, StaleRequest } from './api.ts';
 import { domains, table, displayValue, refundActionState, type Column, type Domain, type RecordData } from './catalog.ts';
 import { badge, button, confirmAction, el, empty, failure, human, link, loading, money, notice } from './dom.ts';
 import { categoryFields, couponFields, doctorFields, editor, lessonFields, liveFields, moduleFields, planFields, productFields, programFields, type Field } from './forms.ts';
-import { availabilityEditor } from './availability.ts';
 export interface PageContext { api: ApiClient; alive: () => boolean; reload: () => void }
 interface ListResult { items: RecordData[]; page: number; hasMore: boolean }
 interface Readiness { name: string; status: string }
@@ -100,7 +99,22 @@ export function detailPage(domain: Domain, id: string, context: PageContext) {
       body.append(userActivity(id, context));
     }
     if (domain.id === 'doctors' && item.registrationStartedAt) body.append(registrationReview(id, context));
-    if (domain.id === 'doctors') body.append(section('Professional profile & verification', editor(item.registrationStartedAt ? doctorFields.filter(f => f.key !== 'verificationStatus') : doctorFields, item, requestSave(`/admin/operations/doctors/${id}`, 'PATCH', payload => item.registrationStartedAt ? ({ ...payload, verificationStatus: item.verificationStatus }) : payload), options), 'Confirm registration and qualifications before selecting Verified. Never enter assumed credentials.'), section('Appointment availability', availabilityEditor(item, id, context)));
+    if (domain.id === 'doctors') {
+      body.append(section('Doctor details', facts(item, doctorFields.map(field => ({
+        key: field.key, label: field.key === 'qualification' ? 'Qualification' : field.key === 'languages' ? 'Languages' : field.key === 'feePaise' ? 'Consultation fee' : field.label,
+        kind: field.key === 'feePaise' ? 'money' : field.type === 'checkbox' ? 'boolean' : field.key === 'verificationStatus' ? 'status' : undefined,
+      }))), 'Read-only. The doctor supplies these details. Request corrections through application review when needed.'));
+      const schedule = el('div', '', facts(item, [{ key: 'timezone', label: 'Timezone' }, { key: 'consultationMinutes', label: 'Consultation length (minutes)' }, { key: 'bufferMinutes', label: 'Buffer (minutes)' }]));
+      const windows = Array.isArray(item.availability) ? item.availability as RecordData[] : [];
+      const clock = (value: unknown) => `${String(Math.floor(Number(value) / 60)).padStart(2, '0')}:${String(Number(value) % 60).padStart(2, '0')}`;
+      schedule.append(windows.length ? table(windows.map(window => ({ ...window,
+        day: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][Number(window.weekday) - 1],
+        start: clock(window.startMinute), end: clock(window.endMinute),
+      })), [{ key: 'day', label: 'Day' }, { key: 'start', label: 'From' }, { key: 'end', label: 'Until' }]) : el('p', '', 'No weekly availability set.'));
+      const exceptions = Array.isArray(item.exceptions) ? item.exceptions as RecordData[] : [];
+      schedule.append(el('p', '', `Unavailable dates: ${exceptions.map(exception => String(exception.localDate)).join(', ') || 'None'}`));
+      body.append(section('Appointment availability', schedule, 'Read-only. The doctor manages their schedule.'));
+    }
     if (domain.id === 'programs') {
       const referenceFields = programFields.map(field => ['doctorId', 'categoryId'].includes(field.key) ? {
         ...field, label: field.key === 'doctorId' ? 'Leading doctor' : 'Program category', lookup: {
